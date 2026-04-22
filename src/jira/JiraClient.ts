@@ -42,11 +42,17 @@ export class JiraClient {
         kind: 'ratelimit',
         status,
         message: 'Rate limited.',
-        retryAfterSeconds: retryAfter ? parseInt(retryAfter, 10) : 5,
+        retryAfterSeconds: this.parseRetryAfter(retryAfter),
       };
     }
     if (status >= 500) return { kind: 'server', status, message: `Server error ${status}.` };
     return { kind: 'unknown', status, message: `Unexpected status ${status}.` };
+  }
+
+  private parseRetryAfter(v?: string): number {
+    if (!v) return 5;
+    const n = parseInt(v, 10);
+    return Number.isFinite(n) && n > 0 ? n : 5;
   }
 
   async request<T = any>(opts: RequestOptions): Promise<T> {
@@ -190,7 +196,7 @@ export class JiraClient {
     });
   }
 
-  async createIssue(input: CreateIssueInput): Promise<Issue> {
+  async createIssue(input: CreateIssueInput): Promise<{ id: string; key: string }> {
     const fields: any = {
       project: { key: input.projectKey },
       issuetype: { name: input.issueTypeName },
@@ -203,12 +209,12 @@ export class JiraClient {
     if (input.assigneeAccountId) fields.assignee = { accountId: input.assigneeAccountId };
     if (input.duedate) fields.duedate = input.duedate;
 
-    const raw = await this.request<any>({
+    const raw = await this.request<{ id: string; key: string }>({
       method: 'POST',
       path: '/rest/api/3/issue',
       body: { fields },
     });
-    return this.mapIssue(raw);
+    return { id: raw.id, key: raw.key };
   }
 
   async updateIssue(key: string, patch: FieldPatch): Promise<void> {
@@ -229,20 +235,32 @@ export class JiraClient {
   }
 
   async addComment(key: string, body: string): Promise<Comment> {
+    const adfBody = {
+      version: 1,
+      type: 'doc',
+      content: [{ type: 'paragraph', content: [{ type: 'text', text: body }] }],
+    };
     const raw = await this.request<any>({
       method: 'POST',
       path: `/rest/api/3/issue/${encodeURIComponent(key)}/comment`,
-      body: { body },
+      body: { body: adfBody },
     });
     return {
-      id: raw.id, author: raw.author, body: raw.body,
+      id: raw.id, author: raw.author, body,
       created: raw.created, updated: raw.updated,
     };
   }
 
   async logWork(key: string, seconds: number, comment?: string): Promise<Worklog> {
+    if (seconds <= 0) throw { kind: 'unknown', message: 'logWork: seconds must be > 0' } as JiraError;
     const body: any = { timeSpentSeconds: seconds };
-    if (comment) body.comment = comment;
+    if (comment) {
+      body.comment = {
+        version: 1,
+        type: 'doc',
+        content: [{ type: 'paragraph', content: [{ type: 'text', text: comment }] }],
+      };
+    }
     const raw = await this.request<any>({
       method: 'POST',
       path: `/rest/api/3/issue/${encodeURIComponent(key)}/worklog`,
@@ -250,7 +268,7 @@ export class JiraClient {
     });
     return {
       id: raw.id, author: raw.author, timeSpentSeconds: raw.timeSpentSeconds,
-      comment: raw.comment, started: raw.started,
+      comment: comment ?? undefined, started: raw.started,
     };
   }
 

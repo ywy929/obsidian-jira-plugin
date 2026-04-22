@@ -237,25 +237,22 @@ describe('JiraClient transitions', () => {
 describe('JiraClient write ops', () => {
   beforeEach(() => mockedRequestUrl.mockReset());
 
-  it('createIssue POSTs fields payload and returns mapped issue', async () => {
+  it('createIssue POSTs fields payload and returns id + key', async () => {
     mockedRequestUrl.mockResolvedValueOnce({
       status: 201,
-      json: { id: '99', key: 'PROD-99', fields: {
-        summary: 'New', status: { id: '1', name: 'To Do', statusCategory: { key: 'new' } },
-        labels: ['adhoc'], subtasks: [], issuetype: { name: 'Task', subtask: false },
-        comment: { comments: [] }, attachment: [], worklog: { worklogs: [] },
-      }},
+      json: { id: '99', key: 'PROD-99', self: 'https://example.atlassian.net/rest/api/3/issue/99' },
     } as any);
 
     const client = new JiraClient(baseSettings);
-    const issue = await client.createIssue({
+    const result = await client.createIssue({
       projectKey: 'PROD',
       issueTypeName: 'Task',
       summary: 'New',
       labels: ['adhoc'],
     });
 
-    expect(issue.key).toBe('PROD-99');
+    expect(result.key).toBe('PROD-99');
+    expect(result.id).toBe('99');
     const body = JSON.parse(mockedRequestUrl.mock.calls[0][0].body as string);
     expect(body.fields.project.key).toBe('PROD');
     expect(body.fields.issuetype.name).toBe('Task');
@@ -265,11 +262,7 @@ describe('JiraClient write ops', () => {
   it('createIssue includes parent when creating subtask', async () => {
     mockedRequestUrl.mockResolvedValueOnce({
       status: 201,
-      json: { id: '100', key: 'PROD-100', fields: {
-        summary: 'Sub', status: { id: '1', name: 'To Do', statusCategory: { key: 'new' } },
-        labels: [], subtasks: [], issuetype: { name: 'Sub-task', subtask: true },
-        parent: { key: 'PROD-1' }, comment: { comments: [] }, attachment: [], worklog: { worklogs: [] },
-      }},
+      json: { id: '100', key: 'PROD-100', self: 'https://example.atlassian.net/rest/api/3/issue/100' },
     } as any);
 
     const client = new JiraClient(baseSettings);
@@ -325,7 +318,8 @@ describe('JiraClient write ops', () => {
     const comment = await client.addComment('PROD-1', 'Hello');
     expect(comment.body).toBe('Hello');
     const body = JSON.parse(mockedRequestUrl.mock.calls[0][0].body as string);
-    expect(body.body).toBe('Hello');
+    expect(body.body.type).toBe('doc');
+    expect(body.body.content[0].content[0].text).toBe('Hello');
   });
 
   it('logWork POSTs worklog payload with timeSpentSeconds', async () => {
@@ -343,7 +337,8 @@ describe('JiraClient write ops', () => {
     expect(wl.timeSpentSeconds).toBe(1800);
     const body = JSON.parse(mockedRequestUrl.mock.calls[0][0].body as string);
     expect(body.timeSpentSeconds).toBe(1800);
-    expect(body.comment).toBe('pairing');
+    expect(body.comment.type).toBe('doc');
+    expect(body.comment.content[0].content[0].text).toBe('pairing');
   });
 
   it('attachFile sends multipart with X-Atlassian-Token no-check', async () => {
