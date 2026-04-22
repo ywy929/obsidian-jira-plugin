@@ -129,6 +129,55 @@ export class DailyNoteSync {
     if (newStat) this.lastKnownMtime.set(path, newStat.mtime);
   }
 
+  async appendInterrupt(issueKey: string): Promise<void> {
+    await this.appendUnderHeading('## Interrupts (#adhoc)', `- [ ] ${issueKey}`);
+  }
+
+  async appendBlocker(issueKey: string, unblocker: string, ageDays?: number): Promise<void> {
+    const ageStr = ageDays !== undefined ? ` — ${ageDays} days` : '';
+    await this.appendUnderHeading('## Blockers', `- ${issueKey} — ${unblocker}${ageStr}`);
+  }
+
+  private async appendUnderHeading(heading: string, newLine: string): Promise<void> {
+    const path = this.pathFor(this.now);
+    if (!(await this.vault.exists(path))) await this.ensureTodayNote();
+
+    const content = await this.vault.read(path);
+    const lines = content.split(/\r?\n/);
+    const headingIdx = lines.findIndex(l => l.trim() === heading);
+    if (headingIdx === -1) throw { kind: 'unknown', message: `Heading "${heading}" not found.` };
+
+    // find end of section: next ## or EOF
+    let endIdx = lines.length;
+    for (let i = headingIdx + 1; i < lines.length; i++) {
+      if (/^## /.test(lines[i].trim())) { endIdx = i; break; }
+    }
+
+    // drop trailing blank lines and the placeholder "- " line if present; insert before section end
+    const sectionLines = lines.slice(headingIdx + 1, endIdx);
+    const cleaned: string[] = [];
+    let insertedPlaceholderSkipped = false;
+    for (const l of sectionLines) {
+      if (!insertedPlaceholderSkipped && l.trim() === '-') { insertedPlaceholderSkipped = true; continue; }
+      cleaned.push(l);
+    }
+
+    // trim trailing blanks
+    while (cleaned.length > 0 && cleaned[cleaned.length - 1].trim() === '') cleaned.pop();
+    cleaned.push(newLine);
+    cleaned.push('');
+
+    const updated = [
+      ...lines.slice(0, headingIdx + 1),
+      ...cleaned,
+      ...lines.slice(endIdx),
+    ].join('\n');
+
+    await this.vault.write(path, updated);
+    const stat = await this.vault.stat(path);
+    if (stat) this.lastKnownMtime.set(path, stat.mtime);
+  }
+
   private escape(s: string): string { return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
 
   private replaceLaneItems(

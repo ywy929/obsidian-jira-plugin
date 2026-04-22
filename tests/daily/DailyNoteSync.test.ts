@@ -185,3 +185,40 @@ ${body}
     expect(content).toContain('- [ ] PROD-269'); // unchanged
   });
 });
+
+describe('DailyNoteSync.appendInterrupt / appendBlocker', () => {
+  it('appends issue key under ## Interrupts (#adhoc)', async () => {
+    const vault = new InMemoryVault();
+    const sync = new DailyNoteSync(vault, 'daily', new Date(2026, 3, 22));
+    await sync.ensureTodayNote();
+
+    await sync.appendInterrupt('PROD-300');
+
+    const content = await vault.read('daily/2026-04-22.md');
+    expect(content).toMatch(/## Interrupts \(#adhoc\)[\s\S]*- \[ \] PROD-300/);
+  });
+
+  it('appends multiple interrupts on separate lines', async () => {
+    const vault = new InMemoryVault();
+    const sync = new DailyNoteSync(vault, 'daily', new Date(2026, 3, 22));
+    await sync.ensureTodayNote();
+
+    await sync.appendInterrupt('PROD-300');
+    await sync.appendInterrupt('SL-99');
+
+    const content = await vault.read('daily/2026-04-22.md');
+    expect(content).toContain('- [ ] PROD-300');
+    expect(content).toContain('- [ ] SL-99');
+  });
+
+  it('appends blocker with unblocker name and age', async () => {
+    const vault = new InMemoryVault();
+    const sync = new DailyNoteSync(vault, 'daily', new Date(2026, 3, 22));
+    await sync.ensureTodayNote();
+
+    await sync.appendBlocker('SL-5', 'chikeen', 3);
+
+    const content = await vault.read('daily/2026-04-22.md');
+    expect(content).toMatch(/## Blockers[\s\S]*SL-5 — chikeen — 3 days/);
+  });
+});
