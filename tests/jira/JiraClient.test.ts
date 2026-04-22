@@ -51,17 +51,22 @@ describe('JiraClient base request', () => {
   });
 
   it('classifies 429 as ratelimit and parses Retry-After', async () => {
+    jest.useFakeTimers();
     mockedRequestUrl.mockResolvedValueOnce({
       status: 429,
       headers: { 'retry-after': '12' },
       json: {},
     } as any);
     const client = new JiraClient(baseSettings);
-    await expect(client.getMyself()).rejects.toMatchObject({
+    const promise = client.getMyself();
+    const assertion = expect(promise).rejects.toMatchObject({
       kind: 'ratelimit',
       status: 429,
       retryAfterSeconds: 12,
     });
+    await jest.advanceTimersByTimeAsync(13000);
+    await assertion;
+    jest.useRealTimers();
   });
 
   it('classifies 5xx as server error', async () => {

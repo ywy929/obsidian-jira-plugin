@@ -6,5 +6,4 @@ module.exports = {
   moduleNameMapper: {
     '^obsidian$': '<rootDir>/tests/__mocks__/obsidian.ts',
   },
-  testTimeout: 15000,
 };
