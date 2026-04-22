@@ -185,3 +185,51 @@ describe('JiraClient.getIssue', () => {
     expect(issue.acceptanceCriteria).toEqual([]);
   });
 });
+
+describe('JiraClient transitions', () => {
+  beforeEach(() => mockedRequestUrl.mockReset());
+
+  it('fetches transitions for an issue', async () => {
+    mockedRequestUrl.mockResolvedValueOnce({
+      status: 200,
+      json: {
+        transitions: [
+          { id: '11', name: 'In Progress', to: { id: '1', name: 'In Progress', statusCategory: { key: 'indeterminate' } } },
+          { id: '31', name: 'Done', to: { id: '2', name: 'Done', statusCategory: { key: 'done' } } },
+        ],
+      },
+    } as any);
+
+    const client = new JiraClient(baseSettings);
+    const transitions = await client.getTransitions('PROD-1');
+    expect(transitions).toHaveLength(2);
+    expect(transitions[1].name).toBe('Done');
+  });
+
+  it('caches transitions per-project (second call to same project hits no API)', async () => {
+    // first call
+    mockedRequestUrl.mockResolvedValueOnce({
+      status: 200,
+      json: { transitions: [{ id: '31', name: 'Done', to: { id: '2', name: 'Done', statusCategory: { key: 'done' } } }] },
+    } as any);
+
+    const client = new JiraClient(baseSettings);
+    await client.getTransitions('PROD-1');
+    await client.getTransitions('PROD-2');  // same project, should be cached
+
+    expect(mockedRequestUrl).toHaveBeenCalledTimes(1);
+  });
+
+  it('transitionIssue POSTs the transition id', async () => {
+    mockedRequestUrl.mockResolvedValueOnce({ status: 204, json: {} } as any);
+
+    const client = new JiraClient(baseSettings);
+    await client.transitionIssue('PROD-1', '31');
+
+    const callArgs = mockedRequestUrl.mock.calls[0][0];
+    expect(callArgs.method).toBe('POST');
+    expect(callArgs.url).toContain('/rest/api/3/issue/PROD-1/transitions');
+    const body = JSON.parse(callArgs.body as string);
+    expect(body.transition.id).toBe('31');
+  });
+});

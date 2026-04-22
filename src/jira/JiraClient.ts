@@ -1,6 +1,6 @@
 import { requestUrl, RequestUrlParam } from 'obsidian';
 import { PluginSettings } from '../settings/types';
-import { JiraError, User, Issue } from './types';
+import { JiraError, User, Issue, Transition } from './types';
 import { parseAcceptanceCriteria } from './ac-parser';
 
 type RequestOptions = {
@@ -14,6 +14,8 @@ type RequestOptions = {
 };
 
 export class JiraClient {
+  private transitionCache = new Map<string, Transition[]>();
+
   constructor(private settings: PluginSettings) {}
 
   private authHeader(): string {
@@ -163,5 +165,28 @@ export class JiraClient {
       query: { expand: 'renderedFields', fields: '*all' },
     });
     return this.mapIssue(raw);
+  }
+
+  async getTransitions(issueKey: string): Promise<Transition[]> {
+    const projectKey = issueKey.split('-')[0];
+    const cached = this.transitionCache.get(projectKey);
+    if (cached) return cached;
+
+    const raw = await this.request<any>({
+      path: `/rest/api/3/issue/${encodeURIComponent(issueKey)}/transitions`,
+    });
+    const transitions: Transition[] = (raw.transitions ?? []).map((t: any) => ({
+      id: t.id, name: t.name, to: t.to,
+    }));
+    this.transitionCache.set(projectKey, transitions);
+    return transitions;
+  }
+
+  async transitionIssue(issueKey: string, transitionId: string): Promise<void> {
+    await this.request<void>({
+      method: 'POST',
+      path: `/rest/api/3/issue/${encodeURIComponent(issueKey)}/transitions`,
+      body: { transition: { id: transitionId } },
+    });
   }
 }
