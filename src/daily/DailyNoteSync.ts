@@ -31,7 +31,11 @@ export class DailyNoteSync {
   async ensureTodayNote(): Promise<string> {
     await this.vault.ensureFolder(this.dailyFolder);
     const path = this.pathFor(this.now);
-    if (await this.vault.exists(path)) return path;
+    if (await this.vault.exists(path)) {
+      const stat = await this.vault.stat(path);
+      if (stat) this.lastKnownMtime.set(path, stat.mtime);
+      return path;
+    }
 
     const content = renderTemplate({
       isoDate: this.isoFor(this.now),
@@ -101,6 +105,31 @@ export class DailyNoteSync {
     }
     return result;
   }
+
+  async toggleCheckbox(issueKey: string, done: boolean): Promise<void> {
+    const path = this.pathFor(this.now);
+    if (!(await this.vault.exists(path))) return;
+
+    const stat = await this.vault.stat(path);
+    const lastKnown = this.lastKnownMtime.get(path);
+    if (lastKnown !== undefined && stat && stat.mtime > lastKnown) {
+      throw { kind: 'conflict', message: 'Daily note changed on disk.' };
+    }
+
+    const content = await this.vault.read(path);
+    const escaped = this.escape(issueKey);
+    const newMark = done ? 'x' : ' ';
+    const oldMark = done ? ' ' : 'x';
+    const pattern = new RegExp(`^- \\[${oldMark === ' ' ? ' ' : 'x'}\\] ${escaped}\\b`, 'm');
+    if (!pattern.test(content)) return;
+
+    const updated = content.replace(pattern, `- [${newMark}] ${issueKey}`);
+    await this.vault.write(path, updated);
+    const newStat = await this.vault.stat(path);
+    if (newStat) this.lastKnownMtime.set(path, newStat.mtime);
+  }
+
+  private escape(s: string): string { return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
 
   private replaceLaneItems(
     content: string, section: 'Yesterday' | 'Today', lane: LaneName, items: string[],

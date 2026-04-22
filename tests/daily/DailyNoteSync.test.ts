@@ -103,3 +103,85 @@ type: daily
     expect(await vault.exists('daily/2026-04-22.md')).toBe(true);
   });
 });
+
+describe('DailyNoteSync.toggleCheckbox', () => {
+  async function setupToday(vault: InMemoryVault, body: string) {
+    const content = `---
+type: daily
+---
+
+# Wednesday, 22 Apr 2026
+
+## Yesterday
+### Tram
+- [ ]
+### GIMS
+- [ ]
+### Smart Street Light
+- [ ]
+
+## Today
+${body}
+
+## Interrupts (#adhoc)
+-
+
+## Blockers
+-
+
+## Decisions / Notes
+-
+`;
+    await vault.write('daily/2026-04-22.md', content);
+  }
+
+  it('flips [ ] to [x] for a given key', async () => {
+    const vault = new InMemoryVault();
+    await setupToday(vault, `### Tram\n- [ ] PROD-269\n### GIMS\n- [ ]\n### Smart Street Light\n- [ ]`);
+    const sync = new DailyNoteSync(vault, 'daily', new Date(2026, 3, 22));
+    await sync.ensureTodayNote();  // loads mtime
+
+    await sync.toggleCheckbox('PROD-269', true);
+
+    const content = await vault.read('daily/2026-04-22.md');
+    expect(content).toContain('- [x] PROD-269');
+  });
+
+  it('flips [x] back to [ ]', async () => {
+    const vault = new InMemoryVault();
+    await setupToday(vault, `### Tram\n- [x] PROD-269\n### GIMS\n- [ ]\n### Smart Street Light\n- [ ]`);
+    const sync = new DailyNoteSync(vault, 'daily', new Date(2026, 3, 22));
+    await sync.ensureTodayNote();
+
+    await sync.toggleCheckbox('PROD-269', false);
+
+    const content = await vault.read('daily/2026-04-22.md');
+    expect(content).toContain('- [ ] PROD-269');
+    expect(content).not.toContain('- [x] PROD-269');
+  });
+
+  it('throws conflict error when file has been modified externally', async () => {
+    const vault = new InMemoryVault();
+    await setupToday(vault, `### Tram\n- [ ] PROD-269\n### GIMS\n- [ ]\n### Smart Street Light\n- [ ]`);
+    const sync = new DailyNoteSync(vault, 'daily', new Date(2026, 3, 22));
+    await sync.ensureTodayNote();
+
+    // simulate external edit bumping mtime
+    await new Promise(r => setTimeout(r, 5));
+    await vault.write('daily/2026-04-22.md', 'MANUALLY CHANGED');
+
+    await expect(sync.toggleCheckbox('PROD-269', true))
+      .rejects.toMatchObject({ kind: 'conflict' });
+  });
+
+  it('noop when key not in today\'s note', async () => {
+    const vault = new InMemoryVault();
+    await setupToday(vault, `### Tram\n- [ ] PROD-269\n### GIMS\n- [ ]\n### Smart Street Light\n- [ ]`);
+    const sync = new DailyNoteSync(vault, 'daily', new Date(2026, 3, 22));
+    await sync.ensureTodayNote();
+
+    await sync.toggleCheckbox('SL-99', true); // not present
+    const content = await vault.read('daily/2026-04-22.md');
+    expect(content).toContain('- [ ] PROD-269'); // unchanged
+  });
+});
