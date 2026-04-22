@@ -97,3 +97,91 @@ describe('JiraClient base request', () => {
     jest.useRealTimers();
   });
 });
+
+describe('JiraClient.searchMyIssues', () => {
+  beforeEach(() => mockedRequestUrl.mockReset());
+
+  it('sends JQL for assigned-to-me in open sprint of given project', async () => {
+    mockedRequestUrl.mockResolvedValueOnce({
+      status: 200,
+      json: {
+        issues: [{
+          id: '1', key: 'PROD-1',
+          fields: {
+            summary: 'Test', status: { id: '1', name: 'In Progress', statusCategory: { key: 'indeterminate' } },
+            priority: { id: '3', name: 'Medium' },
+            assignee: { accountId: 'abc', displayName: 'Me' },
+            labels: [], subtasks: [], issuetype: { name: 'Task', subtask: false },
+          },
+        }],
+        isLast: true,
+      },
+    } as any);
+
+    const settings = { ...baseSettings, selfAccountId: 'abc' };
+    const client = new JiraClient(settings);
+    const issues = await client.searchMyIssues('PROD');
+
+    expect(issues).toHaveLength(1);
+    expect(issues[0].key).toBe('PROD-1');
+
+    const callArgs = mockedRequestUrl.mock.calls[0][0];
+    expect(callArgs.method).toBe('POST');
+    expect(callArgs.url).toContain('/rest/api/3/search/jql');
+    const body = JSON.parse(callArgs.body as string);
+    expect(body.jql).toContain('project = PROD');
+    expect(body.jql).toContain('assignee = currentUser()');
+    expect(body.jql).toContain('sprint in openSprints()');
+  });
+});
+
+describe('JiraClient.getIssue', () => {
+  beforeEach(() => mockedRequestUrl.mockReset());
+
+  it('fetches an issue with markdown description and populates acceptanceCriteria', async () => {
+    mockedRequestUrl.mockResolvedValueOnce({
+      status: 200,
+      json: {
+        id: '1', key: 'SL-5',
+        fields: {
+          summary: 'Finalise arch',
+          description: '**Acceptance Criteria**\n\n* one\n* two',
+          status: { id: '1', name: 'Blocked', statusCategory: { key: 'indeterminate' } },
+          labels: [], subtasks: [], issuetype: { name: 'Story', subtask: false },
+          comment: { comments: [] },
+          attachment: [],
+          worklog: { worklogs: [] },
+        },
+      },
+    } as any);
+
+    const client = new JiraClient(baseSettings);
+    const issue = await client.getIssue('SL-5');
+
+    expect(issue.acceptanceCriteria).toEqual(['one', 'two']);
+    expect(issue.summary).toBe('Finalise arch');
+
+    const callArgs = mockedRequestUrl.mock.calls[0][0];
+    expect(callArgs.url).toContain('/rest/api/3/issue/SL-5');
+    expect(callArgs.url).toContain('expand=renderedFields');
+  });
+
+  it('returns empty acceptanceCriteria when description has no AC heading', async () => {
+    mockedRequestUrl.mockResolvedValueOnce({
+      status: 200,
+      json: {
+        id: '1', key: 'SL-1',
+        fields: {
+          summary: 'Whatever', description: 'Just text, no AC heading.',
+          status: { id: '1', name: 'To Do', statusCategory: { key: 'new' } },
+          labels: [], subtasks: [], issuetype: { name: 'Task', subtask: false },
+          comment: { comments: [] }, attachment: [], worklog: { worklogs: [] },
+        },
+      },
+    } as any);
+
+    const client = new JiraClient(baseSettings);
+    const issue = await client.getIssue('SL-1');
+    expect(issue.acceptanceCriteria).toEqual([]);
+  });
+});

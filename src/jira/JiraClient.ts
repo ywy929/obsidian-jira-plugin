@@ -1,6 +1,7 @@
 import { requestUrl, RequestUrlParam } from 'obsidian';
 import { PluginSettings } from '../settings/types';
-import { JiraError, User } from './types';
+import { JiraError, User, Issue } from './types';
+import { parseAcceptanceCriteria } from './ac-parser';
 
 type RequestOptions = {
   method?: 'GET' | 'POST' | 'PUT' | 'DELETE';
@@ -105,5 +106,62 @@ export class JiraClient {
       displayName: raw.displayName,
       emailAddress: raw.emailAddress,
     };
+  }
+
+  private mapIssue(raw: any): Issue {
+    const fields = raw.fields ?? {};
+    const description = fields.description ?? undefined;
+
+    return {
+      id: raw.id,
+      key: raw.key,
+      summary: fields.summary ?? '',
+      description,
+      status: fields.status,
+      priority: fields.priority,
+      assignee: fields.assignee,
+      duedate: fields.duedate ?? undefined,
+      labels: fields.labels ?? [],
+      subtasks: (fields.subtasks ?? []).map((s: any) => ({
+        id: s.id, key: s.key, summary: s.fields?.summary ?? '',
+        status: s.fields?.status, priority: s.fields?.priority,
+      })),
+      comments: (fields.comment?.comments ?? []).map((c: any) => ({
+        id: c.id, author: c.author, body: c.body, created: c.created, updated: c.updated,
+      })),
+      attachments: (fields.attachment ?? []).map((a: any) => ({
+        id: a.id, filename: a.filename, mimeType: a.mimeType, size: a.size,
+        content: a.content, created: a.created,
+      })),
+      worklogs: (fields.worklog?.worklogs ?? []).map((w: any) => ({
+        id: w.id, author: w.author, timeSpentSeconds: w.timeSpentSeconds,
+        comment: w.comment, started: w.started,
+      })),
+      acceptanceCriteria: parseAcceptanceCriteria(description),
+      parent: fields.parent ? { key: fields.parent.key } : undefined,
+      issuetype: { name: fields.issuetype?.name ?? 'Task', subtask: !!fields.issuetype?.subtask },
+    };
+  }
+
+  async searchMyIssues(projectKey: string): Promise<Issue[]> {
+    const jql = `project = ${projectKey} AND assignee = currentUser() AND sprint in openSprints() ORDER BY status, priority DESC`;
+    const raw = await this.request<any>({
+      method: 'POST',
+      path: '/rest/api/3/search/jql',
+      body: {
+        jql,
+        fields: ['summary', 'status', 'priority', 'assignee', 'duedate', 'labels', 'subtasks', 'issuetype', 'parent'],
+        maxResults: 100,
+      },
+    });
+    return (raw.issues ?? []).map((i: any) => this.mapIssue(i));
+  }
+
+  async getIssue(key: string): Promise<Issue> {
+    const raw = await this.request<any>({
+      path: `/rest/api/3/issue/${encodeURIComponent(key)}`,
+      query: { expand: 'renderedFields', fields: '*all' },
+    });
+    return this.mapIssue(raw);
   }
 }
