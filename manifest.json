@@ -1,0 +1,10 @@
+{
+  "id": "daily-workflow",
+  "name": "Daily Workflow",
+  "version": "0.1.0",
+  "minAppVersion": "1.5.0",
+  "description": "Personal daily note + Jira sync for Yeow's workflow.",
+  "author": "Yeow",
+  "authorUrl": "",
+  "isDesktopOnly": true
+}

@@ -1,0 +1,23 @@
+{
+  "name": "obsidian-daily-workflow",
+  "version": "0.1.0",
+  "description": "Personal daily note + Jira sync plugin.",
+  "main": "main.js",
+  "scripts": {
+    "dev": "node esbuild.config.mjs",
+    "build": "node esbuild.config.mjs production",
+    "test": "jest",
+    "test:watch": "jest --watch"
+  },
+  "devDependencies": {
+    "@types/jest": "^29.5.12",
+    "@types/node": "^20.11.0",
+    "builtin-modules": "^3.3.0",
+    "esbuild": "^0.20.0",
+    "jest": "^29.7.0",
+    "obsidian": "latest",
+    "ts-jest": "^29.1.2",
+    "tslib": "^2.6.2",
+    "typescript": "^5.3.3"
+  }
+}
