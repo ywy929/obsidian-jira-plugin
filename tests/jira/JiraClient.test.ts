@@ -233,3 +233,132 @@ describe('JiraClient transitions', () => {
     expect(body.transition.id).toBe('31');
   });
 });
+
+describe('JiraClient write ops', () => {
+  beforeEach(() => mockedRequestUrl.mockReset());
+
+  it('createIssue POSTs fields payload and returns mapped issue', async () => {
+    mockedRequestUrl.mockResolvedValueOnce({
+      status: 201,
+      json: { id: '99', key: 'PROD-99', fields: {
+        summary: 'New', status: { id: '1', name: 'To Do', statusCategory: { key: 'new' } },
+        labels: ['adhoc'], subtasks: [], issuetype: { name: 'Task', subtask: false },
+        comment: { comments: [] }, attachment: [], worklog: { worklogs: [] },
+      }},
+    } as any);
+
+    const client = new JiraClient(baseSettings);
+    const issue = await client.createIssue({
+      projectKey: 'PROD',
+      issueTypeName: 'Task',
+      summary: 'New',
+      labels: ['adhoc'],
+    });
+
+    expect(issue.key).toBe('PROD-99');
+    const body = JSON.parse(mockedRequestUrl.mock.calls[0][0].body as string);
+    expect(body.fields.project.key).toBe('PROD');
+    expect(body.fields.issuetype.name).toBe('Task');
+    expect(body.fields.labels).toEqual(['adhoc']);
+  });
+
+  it('createIssue includes parent when creating subtask', async () => {
+    mockedRequestUrl.mockResolvedValueOnce({
+      status: 201,
+      json: { id: '100', key: 'PROD-100', fields: {
+        summary: 'Sub', status: { id: '1', name: 'To Do', statusCategory: { key: 'new' } },
+        labels: [], subtasks: [], issuetype: { name: 'Sub-task', subtask: true },
+        parent: { key: 'PROD-1' }, comment: { comments: [] }, attachment: [], worklog: { worklogs: [] },
+      }},
+    } as any);
+
+    const client = new JiraClient(baseSettings);
+    await client.createIssue({
+      projectKey: 'PROD',
+      issueTypeName: 'Sub-task',
+      summary: 'Sub',
+      parentKey: 'PROD-1',
+    });
+
+    const body = JSON.parse(mockedRequestUrl.mock.calls[0][0].body as string);
+    expect(body.fields.parent.key).toBe('PROD-1');
+  });
+
+  it('updateIssue PUTs the field patch', async () => {
+    mockedRequestUrl.mockResolvedValueOnce({ status: 204, json: {} } as any);
+
+    const client = new JiraClient(baseSettings);
+    await client.updateIssue('PROD-1', { summary: 'Renamed', priority: { name: 'High' } });
+
+    const callArgs = mockedRequestUrl.mock.calls[0][0];
+    expect(callArgs.method).toBe('PUT');
+    expect(callArgs.url).toContain('/rest/api/3/issue/PROD-1');
+    const body = JSON.parse(callArgs.body as string);
+    expect(body.fields.summary).toBe('Renamed');
+    expect(body.fields.priority.name).toBe('High');
+  });
+
+  it('assignToSelf PUTs accountId from settings', async () => {
+    mockedRequestUrl.mockResolvedValueOnce({ status: 204, json: {} } as any);
+
+    const settings = { ...baseSettings, selfAccountId: 'abc-123' };
+    const client = new JiraClient(settings);
+    await client.assignToSelf('PROD-1');
+
+    const callArgs = mockedRequestUrl.mock.calls[0][0];
+    expect(callArgs.method).toBe('PUT');
+    expect(callArgs.url).toContain('/rest/api/3/issue/PROD-1/assignee');
+    const body = JSON.parse(callArgs.body as string);
+    expect(body.accountId).toBe('abc-123');
+  });
+
+  it('addComment POSTs body and returns mapped comment', async () => {
+    mockedRequestUrl.mockResolvedValueOnce({
+      status: 201,
+      json: {
+        id: 'c1', author: { accountId: 'abc', displayName: 'Me' },
+        body: 'Hello', created: '2026-04-22T10:00:00.000+0000', updated: '2026-04-22T10:00:00.000+0000',
+      },
+    } as any);
+
+    const client = new JiraClient(baseSettings);
+    const comment = await client.addComment('PROD-1', 'Hello');
+    expect(comment.body).toBe('Hello');
+    const body = JSON.parse(mockedRequestUrl.mock.calls[0][0].body as string);
+    expect(body.body).toBe('Hello');
+  });
+
+  it('logWork POSTs worklog payload with timeSpentSeconds', async () => {
+    mockedRequestUrl.mockResolvedValueOnce({
+      status: 201,
+      json: {
+        id: 'w1', author: { accountId: 'abc', displayName: 'Me' },
+        timeSpentSeconds: 1800, comment: 'pairing',
+        started: '2026-04-22T10:00:00.000+0000',
+      },
+    } as any);
+
+    const client = new JiraClient(baseSettings);
+    const wl = await client.logWork('PROD-1', 1800, 'pairing');
+    expect(wl.timeSpentSeconds).toBe(1800);
+    const body = JSON.parse(mockedRequestUrl.mock.calls[0][0].body as string);
+    expect(body.timeSpentSeconds).toBe(1800);
+    expect(body.comment).toBe('pairing');
+  });
+
+  it('attachFile sends multipart with X-Atlassian-Token no-check', async () => {
+    mockedRequestUrl.mockResolvedValueOnce({
+      status: 200,
+      json: [{ id: 'a1', filename: 'x.pdf', mimeType: 'application/pdf', size: 100, content: 'http://...', created: '2026-04-22' }],
+    } as any);
+
+    const client = new JiraClient(baseSettings);
+    const buf = new ArrayBuffer(100);
+    const att = await client.attachFile('PROD-1', 'x.pdf', 'application/pdf', buf);
+    expect(att.filename).toBe('x.pdf');
+
+    const callArgs = mockedRequestUrl.mock.calls[0][0];
+    expect(callArgs.headers['X-Atlassian-Token']).toBe('no-check');
+    expect(callArgs.headers['Content-Type']).toContain('multipart/form-data');
+  });
+});

@@ -1,6 +1,6 @@
 import { requestUrl, RequestUrlParam } from 'obsidian';
 import { PluginSettings } from '../settings/types';
-import { JiraError, User, Issue, Transition } from './types';
+import { JiraError, User, Issue, Transition, Comment, Attachment, Worklog, CreateIssueInput, FieldPatch } from './types';
 import { parseAcceptanceCriteria } from './ac-parser';
 
 type RequestOptions = {
@@ -188,5 +188,95 @@ export class JiraClient {
       path: `/rest/api/3/issue/${encodeURIComponent(issueKey)}/transitions`,
       body: { transition: { id: transitionId } },
     });
+  }
+
+  async createIssue(input: CreateIssueInput): Promise<Issue> {
+    const fields: any = {
+      project: { key: input.projectKey },
+      issuetype: { name: input.issueTypeName },
+      summary: input.summary,
+    };
+    if (input.description) fields.description = input.description;
+    if (input.parentKey) fields.parent = { key: input.parentKey };
+    if (input.labels) fields.labels = input.labels;
+    if (input.priority) fields.priority = { name: input.priority };
+    if (input.assigneeAccountId) fields.assignee = { accountId: input.assigneeAccountId };
+    if (input.duedate) fields.duedate = input.duedate;
+
+    const raw = await this.request<any>({
+      method: 'POST',
+      path: '/rest/api/3/issue',
+      body: { fields },
+    });
+    return this.mapIssue(raw);
+  }
+
+  async updateIssue(key: string, patch: FieldPatch): Promise<void> {
+    await this.request<void>({
+      method: 'PUT',
+      path: `/rest/api/3/issue/${encodeURIComponent(key)}`,
+      body: { fields: patch },
+    });
+  }
+
+  async assignToSelf(key: string): Promise<void> {
+    if (!this.settings.selfAccountId) throw { kind: 'unknown', message: 'selfAccountId not set; call getMyself first.' } as JiraError;
+    await this.request<void>({
+      method: 'PUT',
+      path: `/rest/api/3/issue/${encodeURIComponent(key)}/assignee`,
+      body: { accountId: this.settings.selfAccountId },
+    });
+  }
+
+  async addComment(key: string, body: string): Promise<Comment> {
+    const raw = await this.request<any>({
+      method: 'POST',
+      path: `/rest/api/3/issue/${encodeURIComponent(key)}/comment`,
+      body: { body },
+    });
+    return {
+      id: raw.id, author: raw.author, body: raw.body,
+      created: raw.created, updated: raw.updated,
+    };
+  }
+
+  async logWork(key: string, seconds: number, comment?: string): Promise<Worklog> {
+    const body: any = { timeSpentSeconds: seconds };
+    if (comment) body.comment = comment;
+    const raw = await this.request<any>({
+      method: 'POST',
+      path: `/rest/api/3/issue/${encodeURIComponent(key)}/worklog`,
+      body,
+    });
+    return {
+      id: raw.id, author: raw.author, timeSpentSeconds: raw.timeSpentSeconds,
+      comment: raw.comment, started: raw.started,
+    };
+  }
+
+  async attachFile(key: string, filename: string, mimeType: string, fileBytes: ArrayBuffer): Promise<Attachment> {
+    const boundary = '----ObsidianBoundary' + Date.now();
+    const encoder = new TextEncoder();
+    const head = encoder.encode(
+      `--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="${filename}"\r\nContent-Type: ${mimeType}\r\n\r\n`
+    );
+    const tail = encoder.encode(`\r\n--${boundary}--\r\n`);
+
+    const combined = new Uint8Array(head.byteLength + fileBytes.byteLength + tail.byteLength);
+    combined.set(head, 0);
+    combined.set(new Uint8Array(fileBytes), head.byteLength);
+    combined.set(tail, head.byteLength + fileBytes.byteLength);
+
+    const raw = await this.request<any[]>({
+      method: 'POST',
+      path: `/rest/api/3/issue/${encodeURIComponent(key)}/attachments`,
+      rawBody: combined.buffer,
+      contentType: `multipart/form-data; boundary=${boundary}`,
+    });
+    const first = raw[0];
+    return {
+      id: first.id, filename: first.filename, mimeType: first.mimeType,
+      size: first.size, content: first.content, created: first.created,
+    };
   }
 }
