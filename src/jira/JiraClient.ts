@@ -161,11 +161,11 @@ export class JiraClient {
   async searchMyIssues(projectKey: string): Promise<Issue[]> {
     const jql = `project = ${projectKey} AND assignee = currentUser() AND sprint in openSprints() ORDER BY status, priority DESC`;
     const raw = await this.request<any>({
-      method: 'POST',
-      path: '/rest/api/3/search/jql',
-      body: {
+      method: 'GET',
+      path: '/rest/api/3/search',
+      query: {
         jql,
-        fields: ['summary', 'status', 'priority', 'assignee', 'duedate', 'labels', 'subtasks', 'issuetype', 'parent'],
+        fields: 'summary,status,priority,assignee,duedate,labels,subtasks,issuetype,parent',
         maxResults: 100,
       },
     });

@@ -126,12 +126,12 @@ describe('JiraClient.searchMyIssues', () => {
     expect(issues[0].key).toBe('PROD-1');
 
     const callArgs = mockedRequestUrl.mock.calls[0][0];
-    expect(callArgs.method).toBe('POST');
-    expect(callArgs.url).toContain('/rest/api/3/search/jql');
-    const body = JSON.parse(callArgs.body as string);
-    expect(body.jql).toContain('project = PROD');
-    expect(body.jql).toContain('assignee = currentUser()');
-    expect(body.jql).toContain('sprint in openSprints()');
+    expect(callArgs.method).toBe('GET');
+    expect(callArgs.url).toContain('/rest/api/3/search?');
+    expect(callArgs.url).toContain('jql=');
+    expect(decodeURIComponent(callArgs.url)).toContain('project = PROD');
+    expect(decodeURIComponent(callArgs.url)).toContain('assignee = currentUser()');
+    expect(decodeURIComponent(callArgs.url)).toContain('sprint in openSprints()');
   });
 });
 
