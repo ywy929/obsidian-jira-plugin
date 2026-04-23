@@ -65,8 +65,9 @@ export class JiraClient {
       headers: {
         Authorization: this.authHeader(),
         Accept: 'application/json',
+        'X-Atlassian-Token': 'no-check',
         ...(isMultipart
-          ? { 'X-Atlassian-Token': 'no-check', 'Content-Type': opts.contentType ?? 'application/octet-stream' }
+          ? { 'Content-Type': opts.contentType ?? 'application/octet-stream' }
           : opts.body !== undefined
             ? { 'Content-Type': 'application/json' }
             : {}),
@@ -93,6 +94,12 @@ export class JiraClient {
 
     const retryAfter = (response as any).headers?.['retry-after'];
     const err = this.classify(response.status, retryAfter);
+    // Attach raw response for debugging (visible via console.error in view layer)
+    (err as any).url = url;
+    let bodyText: string | null = null;
+    try { bodyText = (response as any).text ?? null; } catch { bodyText = null; }
+    (err as any).responseBody = bodyText;
+    console.error('[JiraClient] HTTP ' + response.status + ' on ' + url, bodyText);
 
     // one-shot retry on rate limit
     if (err.kind === 'ratelimit' && !opts.noRetry) {
