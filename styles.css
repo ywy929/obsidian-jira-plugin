@@ -1,1 +1,8 @@
 /* Daily Workflow plugin styles — populated in later tasks */
+
+.dw-view { padding: 8px; font-size: 13px; }
+.dw-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+.dw-header h3 { margin: 0; }
+.dw-refresh { cursor: pointer; padding: 2px 8px; }
+.dw-body { display: flex; flex-direction: column; gap: 8px; }
+.dw-status { color: var(--text-muted); }
