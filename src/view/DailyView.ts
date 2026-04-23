@@ -4,6 +4,7 @@ import { Issue } from '../jira/types';
 import { renderIssueRow } from './IssueRow';
 import { showRowMenu } from './RowMenu';
 import { InterruptModal } from './InterruptModal';
+import { TextPromptModal } from './TextPromptModal';
 
 export const VIEW_TYPE_DAILY = 'daily-workflow-view';
 
@@ -27,7 +28,7 @@ export class DailyView extends ItemView {
     root.addClass('dw-view');
 
     const header = root.createDiv({ cls: 'dw-header' });
-    const title = header.createEl('h3', { text: 'Daily Workflow' });
+    header.createEl('h3', { text: 'Daily Workflow' });
     const refresh = header.createEl('button', { text: '⟳ Refresh', cls: 'dw-refresh' });
     refresh.onclick = () => this.render();
 
@@ -35,7 +36,7 @@ export class DailyView extends ItemView {
     body.createEl('p', { text: 'Loading...', cls: 'dw-status' });
 
     // ensure today's note exists + roll forward
-    const sync = this.plugin.buildDailyNoteSync();
+    const sync = this.plugin.getDailyNoteSync();
     await sync.ensureTodayNote();
     try { await sync.rollForwardFromYesterday(); } catch (_) { /* best effort */ }
 
@@ -93,7 +94,7 @@ export class DailyView extends ItemView {
   }
 
   private async handleToggle(issue: Issue, checked: boolean) {
-    const sync = this.plugin.buildDailyNoteSync();
+    const sync = this.plugin.getDailyNoteSync();
 
     // optimistic markdown write
     try {
@@ -124,9 +125,12 @@ export class DailyView extends ItemView {
       }
       await this.plugin.jira.transitionIssue(issue.key, target.id);
     } catch (e: any) {
-      // rollback markdown
-      await sync.toggleCheckbox(issue.key, !checked);
-      new Notice(`Jira transition failed (${e.kind ?? 'error'}) — rolled back.`);
+      try {
+        await sync.toggleCheckbox(issue.key, !checked);
+        new Notice(`Jira transition failed (${e.kind ?? 'error'}) — rolled back.`);
+      } catch {
+        new Notice(`Jira transition failed AND rollback failed — click Refresh to resync.`);
+      }
       await this.render();
     }
   }
@@ -177,19 +181,20 @@ export class DailyView extends ItemView {
 
       // Add subtask button
       const addBtn = host.createEl('button', { text: '+ Add subtask', cls: 'dw-add-subtask' });
-      addBtn.onclick = async () => {
-        const summary = await promptText(this.plugin.app, 'Subtask summary');
-        if (!summary) return;
-        try {
-          await this.plugin.jira.createIssue({
-            projectKey: issue.key.split('-')[0],
-            issueTypeName: 'Sub-task',
-            summary,
-            parentKey: issue.key,
-          });
-          new Notice('Subtask created.');
-          await this.renderExpansion(issue, host);
-        } catch (e: any) { new Notice(`Failed: ${e.message ?? e.kind}`); }
+      addBtn.onclick = () => {
+        new TextPromptModal(this.app, 'Subtask summary', async (summary) => {
+          if (!summary.trim()) return;
+          try {
+            await this.plugin.jira.createIssue({
+              projectKey: issue.key.split('-')[0],
+              issueTypeName: 'Sub-task',
+              summary,
+              parentKey: issue.key,
+            });
+            new Notice('Subtask created.');
+            await this.renderExpansion(issue, host);
+          } catch (e: any) { new Notice(`Failed: ${e.message ?? e.kind}`); }
+        }).open();
       };
 
       // Description preview (collapsed by default)
@@ -215,9 +220,3 @@ export class DailyView extends ItemView {
   }
 }
 
-function promptText(app: any, label: string): Promise<string | null> {
-  return new Promise(resolve => {
-    const val = window.prompt(label) ?? null;
-    resolve(val);
-  });
-}

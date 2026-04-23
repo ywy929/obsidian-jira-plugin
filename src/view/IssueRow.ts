@@ -30,11 +30,15 @@ export function renderIssueRow(parent: HTMLElement, issue: Issue, cb: RowCallbac
 
   const expansion = wrapper.createDiv({ cls: 'dw-expansion' });
   expansion.style.display = 'none';
+  let populated = false;
 
   summary.onclick = async () => {
     if (expansion.style.display === 'none') {
       expansion.style.display = 'block';
-      await cb.onExpandToggle(issue, expansion);
+      if (!populated) {
+        await cb.onExpandToggle(issue, expansion);
+        populated = true;
+      }
     } else {
       expansion.style.display = 'none';
     }

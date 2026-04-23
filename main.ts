@@ -8,10 +8,12 @@ import { DailyNoteSync, VaultPort } from './src/daily/DailyNoteSync';
 export default class DailyWorkflowPlugin extends Plugin {
   settings: PluginSettings;
   jira: JiraClient;
+  dailyNoteSync: DailyNoteSync;
 
   async onload() {
     await this.loadSettings();
     this.jira = new JiraClient(this.settings);
+    this.dailyNoteSync = new DailyNoteSync(this.buildVaultPort(), this.settings.dailyFolderPath);
     this.addSettingTab(new SettingsTab(this.app, this));
 
     this.registerView(VIEW_TYPE_DAILY, (leaf) => new DailyView(leaf, this));
@@ -30,7 +32,11 @@ export default class DailyWorkflowPlugin extends Plugin {
   async onunload() {}
 
   async activateView() {
-    this.app.workspace.detachLeavesOfType(VIEW_TYPE_DAILY);
+    const existing = this.app.workspace.getLeavesOfType(VIEW_TYPE_DAILY);
+    if (existing.length > 0) {
+      this.app.workspace.revealLeaf(existing[0]);
+      return;
+    }
     const leaf = this.app.workspace.getRightLeaf(false);
     if (!leaf) return;
     await leaf.setViewState({ type: VIEW_TYPE_DAILY, active: true });
@@ -44,6 +50,7 @@ export default class DailyWorkflowPlugin extends Plugin {
   async saveSettings() {
     await this.saveData(this.settings);
     this.jira = new JiraClient(this.settings);
+    this.dailyNoteSync = new DailyNoteSync(this.buildVaultPort(), this.settings.dailyFolderPath);
   }
 
   buildVaultPort(): VaultPort {
@@ -65,8 +72,8 @@ export default class DailyWorkflowPlugin extends Plugin {
     };
   }
 
-  buildDailyNoteSync(): DailyNoteSync {
-    return new DailyNoteSync(this.buildVaultPort(), this.settings.dailyFolderPath);
+  getDailyNoteSync(): DailyNoteSync {
+    return this.dailyNoteSync;
   }
 
   async verifyConnection(): Promise<boolean> {

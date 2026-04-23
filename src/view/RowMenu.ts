@@ -1,6 +1,7 @@
-import { Menu, Notice, Modal, App, Setting } from 'obsidian';
+import { Menu, Notice } from 'obsidian';
 import { Issue } from '../jira/types';
 import DailyWorkflowPlugin from '../../main';
+import { TextPromptModal } from './TextPromptModal';
 
 export function showRowMenu(plugin: DailyWorkflowPlugin, issue: Issue, anchor: HTMLElement): void {
   const menu = new Menu();
@@ -95,20 +96,3 @@ function openFilePickerAndAttach(plugin: DailyWorkflowPlugin, issue: Issue) {
   input.click();
 }
 
-class TextPromptModal extends Modal {
-  value = '';
-  constructor(app: App, private prompt: string, private onSubmit: (v: string) => void, private multiline = false) {
-    super(app);
-  }
-  onOpen() {
-    const { contentEl } = this;
-    contentEl.createEl('h3', { text: this.prompt });
-    new Setting(contentEl)
-      .addTextArea(t => {
-        t.onChange(v => this.value = v);
-        if (!this.multiline) (t as any).inputEl.rows = 1;
-      })
-      .addButton(b => b.setButtonText('OK').setCta().onClick(() => { this.onSubmit(this.value); this.close(); }));
-  }
-  onClose() { this.contentEl.empty(); }
-}

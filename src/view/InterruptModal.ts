@@ -40,7 +40,7 @@ export class InterruptModal extends Modal {
             assigneeAccountId: this.plugin.settings.selfAccountId,
           });
 
-          const sync = this.plugin.buildDailyNoteSync();
+          const sync = this.plugin.getDailyNoteSync();
           await sync.appendInterrupt(issue.key);
 
           new Notice(`Created ${issue.key}`);
