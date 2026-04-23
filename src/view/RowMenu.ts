@@ -2,6 +2,7 @@ import { Menu, Notice } from 'obsidian';
 import { Issue } from '../jira/types';
 import DailyWorkflowPlugin from '../../main';
 import { TextPromptModal } from './TextPromptModal';
+import { LinkModal } from './LinkModal';
 
 export function showRowMenu(plugin: DailyWorkflowPlugin, issue: Issue, anchor: HTMLElement): void {
   const menu = new Menu();
@@ -67,17 +68,7 @@ export function showRowMenu(plugin: DailyWorkflowPlugin, issue: Issue, anchor: H
   }));
 
   menu.addItem(i => i.setTitle('Add link…').setIcon('link').onClick(() => {
-    new TextPromptModal(plugin.app, 'Link URL (line 1) + optional title (line 2)', async v => {
-      const [urlRaw, ...titleParts] = v.split(/\r?\n/);
-      const url = urlRaw.trim();
-      if (!url) return;
-      if (!/^https?:\/\//i.test(url)) { new Notice('URL must start with http:// or https://'); return; }
-      const title = titleParts.join(' ').trim() || undefined;
-      try {
-        await plugin.jira.addRemoteLink(issue.key, url, title);
-        new Notice(`Link added to ${issue.key}.`);
-      } catch (e: any) { new Notice(`Failed: ${e.message ?? e.kind}`); }
-    }, true).open();
+    new LinkModal(plugin.app, plugin, issue.key).open();
   }));
 
   const rect = anchor.getBoundingClientRect();

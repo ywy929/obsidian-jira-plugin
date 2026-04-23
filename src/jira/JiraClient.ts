@@ -279,10 +279,10 @@ export class JiraClient {
     };
   }
 
-  async addRemoteLink(key: string, url: string, title?: string): Promise<{ id: number }> {
+  async addRemoteLink(key: string, url: string, title?: string, summary?: string): Promise<{ id: number }> {
     const object: any = { url };
-    if (title && title.trim()) object.title = title.trim();
-    else object.title = url;
+    object.title = title && title.trim() ? title.trim() : url;
+    if (summary && summary.trim()) object.summary = summary.trim();
     const raw = await this.request<any>({
       method: 'POST',
       path: `/rest/api/3/issue/${encodeURIComponent(key)}/remotelink`,

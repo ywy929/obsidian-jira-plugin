@@ -359,14 +359,14 @@ describe('JiraClient write ops', () => {
     expect(callArgs.headers['Content-Type']).toContain('multipart/form-data');
   });
 
-  it('addRemoteLink POSTs object with url + title', async () => {
+  it('addRemoteLink POSTs object with url + title + summary', async () => {
     mockedRequestUrl.mockResolvedValueOnce({
       status: 201,
       json: { id: 42, self: 'https://example.atlassian.net/rest/api/3/issue/PROD-1/remotelink/42' },
     } as any);
 
     const client = new JiraClient(baseSettings);
-    const result = await client.addRemoteLink('PROD-1', 'https://github.com/org/repo/pull/5', 'PR #5');
+    const result = await client.addRemoteLink('PROD-1', 'https://github.com/org/repo/pull/5', 'PR #5', 'Adds JQL refactor');
 
     expect(result.id).toBe(42);
     const callArgs = mockedRequestUrl.mock.calls[0][0];
@@ -375,6 +375,15 @@ describe('JiraClient write ops', () => {
     const body = JSON.parse(callArgs.body as string);
     expect(body.object.url).toBe('https://github.com/org/repo/pull/5');
     expect(body.object.title).toBe('PR #5');
+    expect(body.object.summary).toBe('Adds JQL refactor');
+  });
+
+  it('addRemoteLink omits summary field when not provided', async () => {
+    mockedRequestUrl.mockResolvedValueOnce({ status: 201, json: { id: 44 } } as any);
+    const client = new JiraClient(baseSettings);
+    await client.addRemoteLink('PROD-1', 'https://example.com', 'title only');
+    const body = JSON.parse(mockedRequestUrl.mock.calls[0][0].body as string);
+    expect(body.object.summary).toBeUndefined();
   });
 
   it('addRemoteLink defaults title to url when omitted', async () => {
