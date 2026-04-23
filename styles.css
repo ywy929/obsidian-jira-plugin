@@ -17,3 +17,12 @@
 .dw-badge-blocked { background: var(--background-modifier-error); color: var(--text-on-accent); }
 .dw-empty { color: var(--text-faint); font-size: 12px; margin: 2px 0; }
 .dw-error { color: var(--text-error); }
+
+.dw-row-wrapper { display: flex; flex-direction: column; }
+.dw-expansion { padding-left: 24px; margin: 4px 0 8px 0; font-size: 12px; }
+.dw-sub-heading { font-weight: bold; margin: 6px 0 2px 0; color: var(--text-muted); font-size: 11px; text-transform: uppercase; cursor: pointer; }
+.dw-ac { margin: 2px 0 6px 16px; padding: 0; }
+.dw-subtasks { margin: 2px 0; }
+.dw-subtask-row { display: flex; align-items: center; gap: 4px; padding: 1px 0; }
+.dw-add-subtask { font-size: 11px; margin-top: 2px; cursor: pointer; background: none; border: 1px dashed var(--background-modifier-border); padding: 2px 6px; }
+.dw-desc { white-space: pre-wrap; background: var(--background-secondary); padding: 6px; border-radius: 3px; font-size: 11px; }

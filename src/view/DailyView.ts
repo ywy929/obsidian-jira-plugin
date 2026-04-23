@@ -73,7 +73,7 @@ export class DailyView extends ItemView {
         for (const issue of g.issues) {
           renderIssueRow(section, issue, {
             onToggle: async (iss, checked) => { await this.handleToggle(iss, checked); },
-            onExpand: async (iss, rowEl) => { new Notice(`expand ${iss.key} (Task 19)`); },
+            onExpandToggle: async (iss, expandEl) => { await this.renderExpansion(iss, expandEl); },
             onMenu: (iss, anchor) => showRowMenu(this.plugin, iss, anchor),
           });
         }
@@ -123,9 +123,93 @@ export class DailyView extends ItemView {
     }
   }
 
+  private async renderExpansion(issue: Issue, host: HTMLElement) {
+    host.empty();
+    host.createEl('p', { text: 'Loading…', cls: 'dw-status' });
+
+    try {
+      const full = await this.plugin.jira.getIssue(issue.key);
+      host.empty();
+
+      // Acceptance Criteria (read-only)
+      if (full.acceptanceCriteria.length > 0) {
+        host.createEl('div', { text: 'Acceptance Criteria', cls: 'dw-sub-heading' });
+        const ul = host.createEl('ul', { cls: 'dw-ac' });
+        for (const ac of full.acceptanceCriteria) ul.createEl('li', { text: ac });
+      }
+
+      // Subtasks
+      host.createEl('div', { text: 'Subtasks', cls: 'dw-sub-heading' });
+      const subList = host.createDiv({ cls: 'dw-subtasks' });
+      if (full.subtasks.length === 0) {
+        subList.createEl('p', { text: '(none)', cls: 'dw-empty' });
+      } else {
+        for (const sub of full.subtasks) {
+          const subRow = subList.createDiv({ cls: 'dw-subtask-row' });
+          const cb = subRow.createEl('input', { type: 'checkbox' }) as HTMLInputElement;
+          cb.checked = sub.status.statusCategory.key === 'done';
+          cb.onchange = async () => {
+            try {
+              const transitions = await this.plugin.jira.getTransitions(sub.key);
+              const target = cb.checked
+                ? transitions.find(t => t.to.statusCategory.key === 'done')
+                : transitions.find(t => t.to.statusCategory.key !== 'done');
+              if (!target) { new Notice(`No transition for ${sub.key}`); return; }
+              await this.plugin.jira.transitionIssue(sub.key, target.id);
+              new Notice(`${sub.key} → ${target.to.name}`);
+            } catch (e: any) {
+              cb.checked = !cb.checked;
+              new Notice(`Failed: ${e.message ?? e.kind}`);
+            }
+          };
+          subRow.createSpan({ cls: 'dw-key', text: sub.key });
+          subRow.createSpan({ text: ' ' + sub.summary });
+        }
+      }
+
+      // Add subtask button
+      const addBtn = host.createEl('button', { text: '+ Add subtask', cls: 'dw-add-subtask' });
+      addBtn.onclick = async () => {
+        const summary = await promptText(this.plugin.app, 'Subtask summary');
+        if (!summary) return;
+        try {
+          await this.plugin.jira.createIssue({
+            projectKey: issue.key.split('-')[0],
+            issueTypeName: 'Sub-task',
+            summary,
+            parentKey: issue.key,
+          });
+          new Notice('Subtask created.');
+          await this.renderExpansion(issue, host);
+        } catch (e: any) { new Notice(`Failed: ${e.message ?? e.kind}`); }
+      };
+
+      // Description preview (collapsed by default)
+      if (full.description) {
+        const descHeading = host.createEl('div', { text: 'Description', cls: 'dw-sub-heading dw-collapsible' });
+        const descBody = host.createDiv({ cls: 'dw-desc' });
+        descBody.style.display = 'none';
+        descBody.setText(full.description);
+        descHeading.onclick = () => {
+          descBody.style.display = descBody.style.display === 'none' ? 'block' : 'none';
+        };
+      }
+    } catch (e: any) {
+      host.empty();
+      host.createEl('p', { text: `Error: ${e.message ?? e.kind}`, cls: 'dw-error' });
+    }
+  }
+
   private laneNameForProject(projectKey: string): string {
     if (projectKey === 'PROD') return 'Tram';
     if (projectKey === 'SL') return 'Smart Street Light (incl. GIMS)';
     return projectKey;
   }
+}
+
+function promptText(app: any, label: string): Promise<string | null> {
+  return new Promise(resolve => {
+    const val = window.prompt(label) ?? null;
+    resolve(val);
+  });
 }
