@@ -59,19 +59,29 @@ export class JiraClient {
     const url = this.buildUrl(opts.path, opts.query);
     const isMultipart = !!opts.rawBody;
 
+    // Obsidian's requestUrl is known to filter a literal 'X-Atlassian-Token' header,
+    // but transmits it when the key is built via a computed property. Setting a
+    // non-browser User-Agent and matching Origin also appears to be required for
+    // Atlassian's XSRF filter to accept the request under Basic auth.
+    // See: https://forum.obsidian.md/t/x-atlassian-token-nocheck-not-beeing-sent-by-requesturl/82035
+    const tokenHeaderKey = 'X-Atlassian-Token';
+    const headers: Record<string, string> = {
+      Authorization: this.authHeader(),
+      Accept: 'application/json',
+      'User-Agent': 'Obsidian.md',
+      Origin: `https://${this.settings.jiraBaseUrl}`,
+      [tokenHeaderKey]: 'no-check',
+    };
+    if (isMultipart) {
+      headers['Content-Type'] = opts.contentType ?? 'application/octet-stream';
+    } else if (opts.body !== undefined) {
+      headers['Content-Type'] = 'application/json';
+    }
+
     const params: RequestUrlParam = {
       url,
       method: opts.method ?? 'GET',
-      headers: {
-        Authorization: this.authHeader(),
-        Accept: 'application/json',
-        'X-Atlassian-Token': 'no-check',
-        ...(isMultipart
-          ? { 'Content-Type': opts.contentType ?? 'application/octet-stream' }
-          : opts.body !== undefined
-            ? { 'Content-Type': 'application/json' }
-            : {}),
-      },
+      headers,
       throw: false,
     };
 
