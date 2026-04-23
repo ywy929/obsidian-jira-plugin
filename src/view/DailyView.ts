@@ -260,8 +260,12 @@ export class DailyView extends ItemView {
     window.open(url, '_blank');
   }
 
-  private openProject(projectKey: string): void {
-    const url = `https://${this.plugin.settings.jiraBaseUrl}/jira/software/projects/${encodeURIComponent(projectKey)}/boards`;
+  private async openProject(projectKey: string): Promise<void> {
+    const base = `https://${this.plugin.settings.jiraBaseUrl}`;
+    const boardId = await this.plugin.jira.getBoardIdForProject(projectKey).catch(() => null);
+    const url = boardId
+      ? `${base}/jira/software/projects/${encodeURIComponent(projectKey)}/boards/${boardId}`
+      : `${base}/jira/software/projects/${encodeURIComponent(projectKey)}/boards`;
     window.open(url, '_blank');
   }
 }

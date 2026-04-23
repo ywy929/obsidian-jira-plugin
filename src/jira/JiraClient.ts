@@ -290,6 +290,25 @@ export class JiraClient {
     };
   }
 
+  private boardIdCache = new Map<string, number | null>();
+
+  async getBoardIdForProject(projectKey: string): Promise<number | null> {
+    if (this.boardIdCache.has(projectKey)) return this.boardIdCache.get(projectKey) ?? null;
+    try {
+      const raw = await this.request<any>({
+        method: 'GET',
+        path: '/rest/agile/1.0/board',
+        query: { projectKeyOrId: projectKey, maxResults: 1 },
+      });
+      const id = raw?.values?.[0]?.id ?? null;
+      this.boardIdCache.set(projectKey, id);
+      return id;
+    } catch (e) {
+      this.boardIdCache.set(projectKey, null);
+      return null;
+    }
+  }
+
   async getRemoteLinks(key: string): Promise<import('./types').RemoteLink[]> {
     const raw = await this.request<any[]>({
       method: 'GET',
