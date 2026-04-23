@@ -1,8 +1,9 @@
-import { Plugin, Notice } from 'obsidian';
+import { Plugin, Notice, normalizePath } from 'obsidian';
 import { PluginSettings, DEFAULT_SETTINGS } from './src/settings/types';
 import { SettingsTab } from './src/settings/SettingsTab';
 import { JiraClient } from './src/jira/JiraClient';
 import { DailyView, VIEW_TYPE_DAILY } from './src/view/DailyView';
+import { DailyNoteSync, VaultPort } from './src/daily/DailyNoteSync';
 
 export default class DailyWorkflowPlugin extends Plugin {
   settings: PluginSettings;
@@ -38,6 +39,29 @@ export default class DailyWorkflowPlugin extends Plugin {
   async saveSettings() {
     await this.saveData(this.settings);
     this.jira = new JiraClient(this.settings);
+  }
+
+  buildVaultPort(): VaultPort {
+    const vault = this.app.vault;
+    return {
+      exists: async (p: string) => await vault.adapter.exists(normalizePath(p)),
+      read: async (p: string) => await vault.adapter.read(normalizePath(p)),
+      write: async (p: string, c: string) => { await vault.adapter.write(normalizePath(p), c); },
+      stat: async (p: string) => {
+        const s = await vault.adapter.stat(normalizePath(p));
+        return s ? { mtime: s.mtime } : null;
+      },
+      ensureFolder: async (p: string) => {
+        const norm = normalizePath(p);
+        if (!(await vault.adapter.exists(norm))) {
+          await vault.adapter.mkdir(norm);
+        }
+      },
+    };
+  }
+
+  buildDailyNoteSync(): DailyNoteSync {
+    return new DailyNoteSync(this.buildVaultPort(), this.settings.dailyFolderPath);
   }
 
   async verifyConnection(): Promise<boolean> {

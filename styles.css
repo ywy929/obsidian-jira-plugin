@@ -6,3 +6,14 @@
 .dw-refresh { cursor: pointer; padding: 2px 8px; }
 .dw-body { display: flex; flex-direction: column; gap: 8px; }
 .dw-status { color: var(--text-muted); }
+
+.dw-lane h4 { margin: 12px 0 4px 0; font-size: 11px; text-transform: uppercase; color: var(--text-muted); }
+.dw-row { display: flex; align-items: center; gap: 6px; padding: 2px 4px; }
+.dw-row:hover { background: var(--background-secondary); }
+.dw-key { font-family: var(--font-monospace); font-weight: bold; font-size: 12px; }
+.dw-summary { flex: 1; cursor: pointer; }
+.dw-menu-btn { background: none; border: none; cursor: pointer; color: var(--text-muted); padding: 2px 6px; }
+.dw-badge { font-size: 10px; padding: 1px 4px; border-radius: 3px; }
+.dw-badge-blocked { background: var(--background-modifier-error); color: var(--text-on-accent); }
+.dw-empty { color: var(--text-faint); font-size: 12px; margin: 2px 0; }
+.dw-error { color: var(--text-error); }
