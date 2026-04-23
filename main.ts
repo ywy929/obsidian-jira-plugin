@@ -20,6 +20,11 @@ export default class DailyWorkflowPlugin extends Plugin {
       name: 'Open Daily Workflow',
       callback: () => this.activateView(),
     });
+
+    this.app.workspace.onLayoutReady(async () => {
+      const leaves = this.app.workspace.getLeavesOfType(VIEW_TYPE_DAILY);
+      if (leaves.length === 0) await this.activateView();
+    });
   }
 
   async onunload() {}
