@@ -99,3 +99,10 @@ export interface JiraError {
   message: string;
   retryAfterSeconds?: number;
 }
+
+export interface RemoteLink {
+  id: number;
+  url: string;
+  title: string;
+  summary?: string;
+}

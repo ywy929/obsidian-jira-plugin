@@ -27,3 +27,19 @@
 .dw-add-subtask { font-size: 11px; margin-top: 2px; cursor: pointer; background: none; border: 1px dashed var(--background-modifier-border); padding: 2px 6px; }
 .dw-desc { white-space: pre-wrap; background: var(--background-secondary); padding: 6px; border-radius: 3px; font-size: 11px; }
 .dw-add-interrupt { font-size: 12px; padding: 4px 8px; cursor: pointer; }
+
+/* Clickable lane titles + key badges (open in Jira) */
+.dw-clickable { cursor: pointer; }
+.dw-clickable:hover { text-decoration: underline; }
+.dw-lane h4.dw-clickable:hover { color: var(--text-accent); }
+.dw-key.dw-clickable:hover { color: var(--text-accent); }
+
+/* Links + attachments sections in expansion */
+.dw-links, .dw-attachments { margin: 2px 0 6px 16px; }
+.dw-link-row, .dw-attachment-row { padding: 2px 0; display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px; }
+.dw-link-row a, .dw-attachment-row a { word-break: break-all; }
+.dw-link-summary { flex-basis: 100%; color: var(--text-muted); font-size: 11px; padding-left: 12px; }
+.dw-attachment-size { color: var(--text-muted); font-size: 11px; }
+
+/* Link modal fetch status */
+.dw-link-status { font-size: 11px; color: var(--text-muted); padding: 2px 0 4px 0; min-height: 14px; }

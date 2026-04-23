@@ -4,6 +4,7 @@ export interface RowCallbacks {
   onToggle: (issue: Issue, checked: boolean) => Promise<void>;
   onExpandToggle: (issue: Issue, expandEl: HTMLElement) => Promise<void>;
   onMenu: (issue: Issue, anchor: HTMLElement) => void;
+  onKeyClick: (issue: Issue) => void;
 }
 
 export interface RenderedRow {
@@ -18,8 +19,10 @@ export function renderIssueRow(parent: HTMLElement, issue: Issue, cb: RowCallbac
   checkbox.checked = issue.status.statusCategory.key === 'done';
   checkbox.onchange = () => cb.onToggle(issue, checkbox.checked);
 
-  const badge = row.createSpan({ cls: 'dw-key' });
+  const badge = row.createSpan({ cls: 'dw-key dw-clickable' });
   badge.setText(issue.key);
+  badge.title = 'Open in Jira';
+  badge.onclick = (e) => { e.stopPropagation(); cb.onKeyClick(issue); };
 
   if (issue.status.name === 'Blocked') {
     row.createSpan({ cls: 'dw-badge dw-badge-blocked', text: 'Blocked' });

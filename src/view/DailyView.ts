@@ -67,7 +67,10 @@ export class DailyView extends ItemView {
       body.empty();
       for (const g of groups) {
         const section = body.createDiv({ cls: 'dw-lane' });
-        section.createEl('h4', { text: g.lane });
+        const laneHeader = section.createEl('h4', { text: g.lane, cls: 'dw-clickable' });
+        laneHeader.title = `Open ${g.projectKey} project in Jira`;
+        laneHeader.onclick = () => this.openProject(g.projectKey);
+
         if (g.issues.length === 0) {
           section.createEl('p', { text: '(nothing assigned)', cls: 'dw-empty' });
           continue;
@@ -77,6 +80,7 @@ export class DailyView extends ItemView {
             onToggle: async (iss, checked) => { await this.handleToggle(iss, checked); },
             onExpandToggle: async (iss, expandEl) => { await this.renderExpansion(iss, expandEl); },
             onMenu: (iss, anchor) => showRowMenu(this.plugin, iss, anchor),
+            onKeyClick: (iss) => this.openIssue(iss.key),
           });
         }
       }
@@ -150,6 +154,38 @@ export class DailyView extends ItemView {
         for (const ac of full.acceptanceCriteria) ul.createEl('li', { text: ac });
       }
 
+      // Remote links (URLs added via "Add link…")
+      try {
+        const links = await this.plugin.jira.getRemoteLinks(issue.key);
+        if (links.length > 0) {
+          host.createEl('div', { text: 'Links', cls: 'dw-sub-heading' });
+          const linkList = host.createDiv({ cls: 'dw-links' });
+          for (const link of links) {
+            const linkRow = linkList.createDiv({ cls: 'dw-link-row' });
+            const a = linkRow.createEl('a', { text: link.title, href: link.url });
+            a.setAttr('target', '_blank');
+            a.setAttr('rel', 'noopener');
+            if (link.summary) linkRow.createDiv({ text: link.summary, cls: 'dw-link-summary' });
+          }
+        }
+      } catch (e: any) {
+        // non-fatal: link fetch fails → just skip the section
+        console.warn('[DailyView] getRemoteLinks failed:', e);
+      }
+
+      // Attachments (files uploaded via "Attach file…")
+      if (full.attachments.length > 0) {
+        host.createEl('div', { text: 'Attachments', cls: 'dw-sub-heading' });
+        const attList = host.createDiv({ cls: 'dw-attachments' });
+        for (const att of full.attachments) {
+          const attRow = attList.createDiv({ cls: 'dw-attachment-row' });
+          const a = attRow.createEl('a', { text: att.filename, href: att.content });
+          a.setAttr('target', '_blank');
+          a.setAttr('rel', 'noopener');
+          attRow.createSpan({ text: ` (${formatBytes(att.size)})`, cls: 'dw-attachment-size' });
+        }
+      }
+
       // Subtasks
       host.createEl('div', { text: 'Subtasks', cls: 'dw-sub-heading' });
       const subList = host.createDiv({ cls: 'dw-subtasks' });
@@ -218,5 +254,21 @@ export class DailyView extends ItemView {
     if (projectKey === 'SL') return 'Smart Street Light (incl. GIMS)';
     return projectKey;
   }
+
+  private openIssue(issueKey: string): void {
+    const url = `https://${this.plugin.settings.jiraBaseUrl}/browse/${encodeURIComponent(issueKey)}`;
+    window.open(url, '_blank');
+  }
+
+  private openProject(projectKey: string): void {
+    const url = `https://${this.plugin.settings.jiraBaseUrl}/jira/software/projects/${encodeURIComponent(projectKey)}/boards`;
+    window.open(url, '_blank');
+  }
+}
+
+function formatBytes(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
