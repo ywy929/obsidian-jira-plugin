@@ -309,6 +309,30 @@ export class JiraClient {
     }
   }
 
+  async getActiveSprint(projectKey: string): Promise<{ id: number; name: string } | null> {
+    const boardId = await this.getBoardIdForProject(projectKey);
+    if (!boardId) return null;
+    try {
+      const raw = await this.request<any>({
+        method: 'GET',
+        path: `/rest/agile/1.0/board/${boardId}/sprint`,
+        query: { state: 'active', maxResults: 1 },
+      });
+      const s = raw?.values?.[0];
+      return s ? { id: s.id, name: s.name } : null;
+    } catch {
+      return null;
+    }
+  }
+
+  async addIssueToSprint(sprintId: number, issueKey: string): Promise<void> {
+    await this.request<void>({
+      method: 'POST',
+      path: `/rest/agile/1.0/sprint/${sprintId}/issue`,
+      body: { issues: [issueKey] },
+    });
+  }
+
   async getRemoteLinks(key: string): Promise<import('./types').RemoteLink[]> {
     const raw = await this.request<any[]>({
       method: 'GET',

@@ -4,6 +4,7 @@ import { Issue } from '../jira/types';
 import { renderIssueRow } from './IssueRow';
 import { showRowMenu } from './RowMenu';
 import { InterruptModal } from './InterruptModal';
+import { NewTaskModal } from './NewTaskModal';
 import { TextPromptModal } from './TextPromptModal';
 
 export const VIEW_TYPE_DAILY = 'daily-workflow-view';
@@ -90,6 +91,13 @@ export class DailyView extends ItemView {
       const addBtn = interruptSection.createEl('button', { text: '+ Add interrupt', cls: 'dw-add-interrupt' });
       addBtn.onclick = () => {
         new InterruptModal(this.app, this.plugin, this.plugin.settings.projectKeys[0], () => this.render()).open();
+      };
+
+      const newTaskSection = body.createDiv({ cls: 'dw-lane' });
+      newTaskSection.createEl('h4', { text: 'New task' });
+      const newTaskBtn = newTaskSection.createEl('button', { text: '+ Create task', cls: 'dw-add-interrupt' });
+      newTaskBtn.onclick = () => {
+        new NewTaskModal(this.app, this.plugin, this.plugin.settings.projectKeys[0], () => this.render()).open();
       };
     } catch (e: any) {
       body.empty();
