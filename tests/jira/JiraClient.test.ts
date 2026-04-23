@@ -127,7 +127,7 @@ describe('JiraClient.searchMyIssues', () => {
 
     const callArgs = mockedRequestUrl.mock.calls[0][0];
     expect(callArgs.method).toBe('GET');
-    expect(callArgs.url).toContain('/rest/api/3/search?');
+    expect(callArgs.url).toContain('/rest/api/3/search/jql?');
     const qs = callArgs.url.split('?')[1];
     const params = new URLSearchParams(qs);
     const jqlParam = params.get('jql') ?? '';

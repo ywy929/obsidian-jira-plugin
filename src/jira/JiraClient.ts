@@ -162,7 +162,7 @@ export class JiraClient {
     const jql = `project = ${projectKey} AND assignee = currentUser() AND sprint in openSprints() ORDER BY status, priority DESC`;
     const raw = await this.request<any>({
       method: 'GET',
-      path: '/rest/api/3/search',
+      path: '/rest/api/3/search/jql',
       query: {
         jql,
         fields: 'summary,status,priority,assignee,duedate,labels,subtasks,issuetype,parent',
