@@ -71,7 +71,7 @@ export class DailyView extends ItemView {
         }
         for (const issue of g.issues) {
           renderIssueRow(section, issue, {
-            onToggle: async (iss, checked) => { new Notice(`toggle ${iss.key} → ${checked} (Task 16)`); },
+            onToggle: async (iss, checked) => { await this.handleToggle(iss, checked); },
             onExpand: async (iss, rowEl) => { new Notice(`expand ${iss.key} (Task 19)`); },
             onMenu: (iss, anchor) => { new Notice(`menu ${iss.key} (Task 17)`); },
           });
@@ -80,6 +80,45 @@ export class DailyView extends ItemView {
     } catch (e: any) {
       body.empty();
       body.createEl('p', { text: `Error: ${e.message ?? e.kind ?? 'unknown'}`, cls: 'dw-error' });
+    }
+  }
+
+  private async handleToggle(issue: Issue, checked: boolean) {
+    const sync = this.plugin.buildDailyNoteSync();
+
+    // optimistic markdown write
+    try {
+      await sync.toggleCheckbox(issue.key, checked);
+    } catch (e: any) {
+      if (e.kind === 'conflict') {
+        new Notice('Daily note changed on disk — click refresh.');
+        await this.render();
+        return;
+      }
+      new Notice(`Write failed: ${e.message ?? 'unknown'}`);
+      await this.render();
+      return;
+    }
+
+    // resolve transition id
+    try {
+      const transitions = await this.plugin.jira.getTransitions(issue.key);
+      const target = checked
+        ? transitions.find(t => t.to.statusCategory.key === 'done')
+        : transitions.find(t => t.to.name === 'In Progress')
+          ?? transitions.find(t => t.to.name === 'To Do')
+          ?? transitions.find(t => t.to.statusCategory.key !== 'done');
+
+      if (!target) {
+        new Notice(`No suitable transition for ${issue.key}`);
+        return;
+      }
+      await this.plugin.jira.transitionIssue(issue.key, target.id);
+    } catch (e: any) {
+      // rollback markdown
+      await sync.toggleCheckbox(issue.key, !checked);
+      new Notice(`Jira transition failed (${e.kind ?? 'error'}) — rolled back.`);
+      await this.render();
     }
   }
 
