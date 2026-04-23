@@ -222,3 +222,56 @@ describe('DailyNoteSync.appendInterrupt / appendBlocker', () => {
     expect(content).toMatch(/## Blockers[\s\S]*SL-5 — chikeen — 3 days/);
   });
 });
+
+describe('DailyNoteSync.seedToday', () => {
+  it('appends items under the right lane and reports added count', async () => {
+    const vault = new InMemoryVault();
+    const sync = new DailyNoteSync(vault, 'daily', new Date(2026, 3, 22));
+    await sync.ensureTodayNote();
+
+    const result = await sync.seedToday([
+      { lane: 'Tram', text: 'Tram UI close-out' },
+      { lane: 'GIMS', text: 'GIMS docs review' },
+      { lane: 'Cross-cutting', text: 'Junior dev result review' },
+    ]);
+
+    expect(result).toEqual({ added: 3, skipped: 0 });
+    const content = await vault.read('daily/2026-04-22.md');
+    expect(content).toMatch(/### Tram[\s\S]*- \[ \] Tram UI close-out/);
+    expect(content).toMatch(/### GIMS[\s\S]*- \[ \] GIMS docs review/);
+    expect(content).toMatch(/### Cross-cutting[\s\S]*- \[ \] Junior dev result review/);
+  });
+
+  it('skips items already present in the same lane (dedup)', async () => {
+    const vault = new InMemoryVault();
+    const sync = new DailyNoteSync(vault, 'daily', new Date(2026, 3, 22));
+    await sync.ensureTodayNote();
+
+    await sync.seedToday([{ lane: 'Tram', text: 'Tram UI close-out' }]);
+    const second = await sync.seedToday([
+      { lane: 'Tram', text: 'Tram UI close-out' },      // duplicate
+      { lane: 'Tram', text: 'Tram maintenance UI' },    // new
+    ]);
+
+    expect(second).toEqual({ added: 1, skipped: 1 });
+    const content = await vault.read('daily/2026-04-22.md');
+    const occurrences = (content.match(/- \[ \] Tram UI close-out/g) ?? []).length;
+    expect(occurrences).toBe(1);
+    expect(content).toContain('- [ ] Tram maintenance UI');
+  });
+
+  it('ticked-off item in the same text is still considered present (dedup ignores checkbox state)', async () => {
+    const vault = new InMemoryVault();
+    const sync = new DailyNoteSync(vault, 'daily', new Date(2026, 3, 22));
+    await sync.ensureTodayNote();
+
+    // seed then manually tick the item done
+    await sync.seedToday([{ lane: 'Tram', text: 'Tram UI close-out' }]);
+    let content = await vault.read('daily/2026-04-22.md');
+    content = content.replace('- [ ] Tram UI close-out', '- [x] Tram UI close-out');
+    await vault.write('daily/2026-04-22.md', content);
+
+    const result = await sync.seedToday([{ lane: 'Tram', text: 'Tram UI close-out' }]);
+    expect(result).toEqual({ added: 0, skipped: 1 });
+  });
+});

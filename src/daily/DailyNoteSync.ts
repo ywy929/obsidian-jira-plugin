@@ -129,7 +129,7 @@ export class DailyNoteSync {
     if (newStat) this.lastKnownMtime.set(path, newStat.mtime);
   }
 
-  async seedToday(items: { lane: LaneName; text: string }[]): Promise<void> {
+  async seedToday(items: { lane: LaneName; text: string }[]): Promise<{ added: number; skipped: number }> {
     const path = this.pathFor(this.now);
     if (!(await this.vault.exists(path))) await this.ensureTodayNote();
 
@@ -138,9 +138,20 @@ export class DailyNoteSync {
       await this.ensureLaneExists('Today', lane);
     }
 
-    // group items by lane, append each as a checkbox line
-    const byLane = new Map<LaneName, string[]>();
+    // dedup against items already present in today's ## Today section
+    const content = await this.vault.read(path);
+    const existing = this.collectCheckboxTextsBySection(content, 'Today');
+    const toAdd: { lane: LaneName; text: string }[] = [];
+    let skipped = 0;
     for (const item of items) {
+      const laneSet = existing.get(item.lane) ?? new Set<string>();
+      if (laneSet.has(item.text.trim())) { skipped++; continue; }
+      toAdd.push(item);
+    }
+
+    // group by lane, append each as a checkbox line
+    const byLane = new Map<LaneName, string[]>();
+    for (const item of toAdd) {
       const arr = byLane.get(item.lane) ?? [];
       arr.push(`- [ ] ${item.text}`);
       byLane.set(item.lane, arr);
@@ -151,6 +162,36 @@ export class DailyNoteSync {
         await this.appendToLane('Today', lane, line);
       }
     }
+
+    return { added: toAdd.length, skipped };
+  }
+
+  private collectCheckboxTextsBySection(content: string, section: 'Yesterday' | 'Today'): Map<LaneName, Set<string>> {
+    const result = new Map<LaneName, Set<string>>();
+    for (const lane of LANES) result.set(lane, new Set<string>());
+
+    const lines = content.split(/\r?\n/);
+    const sectionStart = lines.findIndex(l => l.trim() === `## ${section}`);
+    if (sectionStart === -1) return result;
+    let sectionEnd = lines.length;
+    for (let i = sectionStart + 1; i < lines.length; i++) {
+      if (/^## /.test(lines[i].trim())) { sectionEnd = i; break; }
+    }
+
+    let currentLane: LaneName | null = null;
+    for (let i = sectionStart + 1; i < sectionEnd; i++) {
+      const trimmed = lines[i].trim();
+      if (/^### /.test(trimmed)) {
+        const name = trimmed.replace(/^###\s*/, '') as LaneName;
+        currentLane = (LANES as readonly string[]).includes(name) ? (name as LaneName) : null;
+        continue;
+      }
+      if (currentLane) {
+        const match = /^- \[(x| )\]\s+(.+?)\s*$/.exec(trimmed);
+        if (match) result.get(currentLane)!.add(match[2].trim());
+      }
+    }
+    return result;
   }
 
   private async ensureLaneExists(section: 'Yesterday' | 'Today', lane: LaneName): Promise<void> {

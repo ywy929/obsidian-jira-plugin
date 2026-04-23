@@ -48,11 +48,12 @@ export class SeedModal extends Modal {
         if (picked.length === 0) { new Notice('Nothing selected.'); return; }
         const sync = this.plugin.getDailyNoteSync();
         try {
-          await sync.seedToday(picked.map(i => ({
+          const result = await sync.seedToday(picked.map(i => ({
             lane: laneForProject(i.project),
             text: i.task,
           })));
-          new Notice(`Seeded ${picked.length} item(s) into today's note.`);
+          const tail = result.skipped > 0 ? ` (${result.skipped} already present, skipped)` : '';
+          new Notice(`Seeded ${result.added} item(s) into today's note.${tail}`);
           this.close();
           this.onDone();
         } catch (e: any) {
