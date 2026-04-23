@@ -2,6 +2,7 @@ import { ItemView, WorkspaceLeaf, Notice } from 'obsidian';
 import DailyWorkflowPlugin from '../../main';
 import { Issue } from '../jira/types';
 import { renderIssueRow } from './IssueRow';
+import { showRowMenu } from './RowMenu';
 
 export const VIEW_TYPE_DAILY = 'daily-workflow-view';
 
@@ -73,7 +74,7 @@ export class DailyView extends ItemView {
           renderIssueRow(section, issue, {
             onToggle: async (iss, checked) => { await this.handleToggle(iss, checked); },
             onExpand: async (iss, rowEl) => { new Notice(`expand ${iss.key} (Task 19)`); },
-            onMenu: (iss, anchor) => { new Notice(`menu ${iss.key} (Task 17)`); },
+            onMenu: (iss, anchor) => showRowMenu(this.plugin, iss, anchor),
           });
         }
       }
