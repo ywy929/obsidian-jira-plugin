@@ -19,6 +19,8 @@ date: ${ctx.isoDate}
 - [ ]
 ### Smart Street Light
 - [ ]
+### Cross-cutting
+- [ ]
 
 ## Today
 ### Tram
@@ -26,6 +28,8 @@ date: ${ctx.isoDate}
 ### GIMS
 - [ ]
 ### Smart Street Light
+- [ ]
+### Cross-cutting
 - [ ]
 
 ## Interrupts (#adhoc)

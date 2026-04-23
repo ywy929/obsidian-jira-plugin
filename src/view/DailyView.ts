@@ -5,6 +5,7 @@ import { renderIssueRow } from './IssueRow';
 import { showRowMenu } from './RowMenu';
 import { InterruptModal } from './InterruptModal';
 import { NewTaskModal } from './NewTaskModal';
+import { SeedModal } from './SeedModal';
 import { TextPromptModal } from './TextPromptModal';
 
 export const VIEW_TYPE_DAILY = 'daily-workflow-view';
@@ -98,6 +99,13 @@ export class DailyView extends ItemView {
       const newTaskBtn = newTaskSection.createEl('button', { text: '+ Create task', cls: 'dw-add-interrupt' });
       newTaskBtn.onclick = () => {
         new NewTaskModal(this.app, this.plugin, this.plugin.settings.projectKeys[0], () => this.render()).open();
+      };
+
+      const seedSection = body.createDiv({ cls: 'dw-lane' });
+      seedSection.createEl('h4', { text: 'Seed today' });
+      const seedBtn = seedSection.createEl('button', { text: '+ Seed from tasks-on-hand', cls: 'dw-add-interrupt' });
+      seedBtn.onclick = () => {
+        new SeedModal(this.app, this.plugin, () => this.render()).open();
       };
     } catch (e: any) {
       body.empty();

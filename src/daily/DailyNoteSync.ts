@@ -8,8 +8,8 @@ export interface VaultPort {
   ensureFolder(path: string): Promise<void>;
 }
 
-type LaneName = 'Tram' | 'GIMS' | 'Smart Street Light';
-const LANES: LaneName[] = ['Tram', 'GIMS', 'Smart Street Light'];
+export type LaneName = 'Tram' | 'GIMS' | 'Smart Street Light' | 'Cross-cutting';
+const LANES: LaneName[] = ['Tram', 'GIMS', 'Smart Street Light', 'Cross-cutting'];
 
 interface ParsedSections {
   yesterday: Record<LaneName, string[]>;  // raw lines (excluding blank placeholder)
@@ -81,8 +81,8 @@ export class DailyNoteSync {
 
   private parseSections(content: string): ParsedSections {
     const result: ParsedSections = {
-      yesterday: { Tram: [], GIMS: [], 'Smart Street Light': [] },
-      today: { Tram: [], GIMS: [], 'Smart Street Light': [] },
+      yesterday: { Tram: [], GIMS: [], 'Smart Street Light': [], 'Cross-cutting': [] },
+      today: { Tram: [], GIMS: [], 'Smart Street Light': [], 'Cross-cutting': [] },
     };
     const lines = content.split(/\r?\n/);
 
@@ -127,6 +127,102 @@ export class DailyNoteSync {
     await this.vault.write(path, updated);
     const newStat = await this.vault.stat(path);
     if (newStat) this.lastKnownMtime.set(path, newStat.mtime);
+  }
+
+  async seedToday(items: { lane: LaneName; text: string }[]): Promise<void> {
+    const path = this.pathFor(this.now);
+    if (!(await this.vault.exists(path))) await this.ensureTodayNote();
+
+    // ensure all lanes exist under ## Today (migrates older files that predate Cross-cutting lane)
+    for (const lane of LANES) {
+      await this.ensureLaneExists('Today', lane);
+    }
+
+    // group items by lane, append each as a checkbox line
+    const byLane = new Map<LaneName, string[]>();
+    for (const item of items) {
+      const arr = byLane.get(item.lane) ?? [];
+      arr.push(`- [ ] ${item.text}`);
+      byLane.set(item.lane, arr);
+    }
+
+    for (const [lane, lines] of byLane.entries()) {
+      for (const line of lines) {
+        await this.appendToLane('Today', lane, line);
+      }
+    }
+  }
+
+  private async ensureLaneExists(section: 'Yesterday' | 'Today', lane: LaneName): Promise<void> {
+    const path = this.pathFor(this.now);
+    const content = await this.vault.read(path);
+    const lines = content.split(/\r?\n/);
+    const sectionStart = lines.findIndex(l => l.trim() === `## ${section}`);
+    if (sectionStart === -1) return;
+    const laneHeader = `### ${lane}`;
+    const laneExists = lines.slice(sectionStart + 1).some((l, _i) => l.trim() === laneHeader);
+    if (laneExists) return;
+
+    // find end of section: next ## or EOF
+    let sectionEnd = lines.length;
+    for (let i = sectionStart + 1; i < lines.length; i++) {
+      if (/^## /.test(lines[i].trim())) { sectionEnd = i; break; }
+    }
+
+    // insert lane header + placeholder before the section end (trim trailing blanks first)
+    const sectionTail = lines.slice(sectionStart + 1, sectionEnd);
+    while (sectionTail.length > 0 && sectionTail[sectionTail.length - 1].trim() === '') sectionTail.pop();
+
+    const updated = [
+      ...lines.slice(0, sectionStart + 1),
+      ...sectionTail,
+      laneHeader,
+      '- [ ]',
+      '',
+      ...lines.slice(sectionEnd),
+    ].join('\n');
+    await this.vault.write(path, updated);
+    const stat = await this.vault.stat(path);
+    if (stat) this.lastKnownMtime.set(path, stat.mtime);
+  }
+
+  private async appendToLane(section: 'Yesterday' | 'Today', lane: LaneName, newLine: string): Promise<void> {
+    const path = this.pathFor(this.now);
+    const content = await this.vault.read(path);
+    const lines = content.split(/\r?\n/);
+    const sectionStart = lines.findIndex(l => l.trim() === `## ${section}`);
+    if (sectionStart === -1) return;
+    const laneHeader = `### ${lane}`;
+    const laneStart = lines.findIndex((l, i) => i > sectionStart && l.trim() === laneHeader);
+    if (laneStart === -1) return;
+
+    // find end of lane: next ### or ## or EOF
+    let laneEnd = lines.length;
+    for (let i = laneStart + 1; i < lines.length; i++) {
+      if (/^#{2,3} /.test(lines[i].trim())) { laneEnd = i; break; }
+    }
+
+    // drop placeholder bare `- [ ]` if present as first/only item
+    const laneBody = lines.slice(laneStart + 1, laneEnd);
+    const cleaned: string[] = [];
+    let skippedPlaceholder = false;
+    for (const l of laneBody) {
+      if (!skippedPlaceholder && l.trim() === '- [ ]') { skippedPlaceholder = true; continue; }
+      cleaned.push(l);
+    }
+    // trim trailing blanks
+    while (cleaned.length > 0 && cleaned[cleaned.length - 1].trim() === '') cleaned.pop();
+    cleaned.push(newLine);
+
+    const updated = [
+      ...lines.slice(0, laneStart + 1),
+      ...cleaned,
+      '',
+      ...lines.slice(laneEnd),
+    ].join('\n');
+    await this.vault.write(path, updated);
+    const stat = await this.vault.stat(path);
+    if (stat) this.lastKnownMtime.set(path, stat.mtime);
   }
 
   async appendInterrupt(issueKey: string): Promise<void> {
