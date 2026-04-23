@@ -3,6 +3,7 @@ import DailyWorkflowPlugin from '../../main';
 import { Issue } from '../jira/types';
 import { renderIssueRow } from './IssueRow';
 import { showRowMenu } from './RowMenu';
+import { InterruptModal } from './InterruptModal';
 
 export const VIEW_TYPE_DAILY = 'daily-workflow-view';
 
@@ -78,6 +79,13 @@ export class DailyView extends ItemView {
           });
         }
       }
+
+      const interruptSection = body.createDiv({ cls: 'dw-lane' });
+      interruptSection.createEl('h4', { text: 'Interrupts' });
+      const addBtn = interruptSection.createEl('button', { text: '+ Add interrupt', cls: 'dw-add-interrupt' });
+      addBtn.onclick = () => {
+        new InterruptModal(this.app, this.plugin, this.plugin.settings.projectKeys[0], () => this.render()).open();
+      };
     } catch (e: any) {
       body.empty();
       body.createEl('p', { text: `Error: ${e.message ?? e.kind ?? 'unknown'}`, cls: 'dw-error' });

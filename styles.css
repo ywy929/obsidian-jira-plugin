@@ -26,3 +26,4 @@
 .dw-subtask-row { display: flex; align-items: center; gap: 4px; padding: 1px 0; }
 .dw-add-subtask { font-size: 11px; margin-top: 2px; cursor: pointer; background: none; border: 1px dashed var(--background-modifier-border); padding: 2px 6px; }
 .dw-desc { white-space: pre-wrap; background: var(--background-secondary); padding: 6px; border-radius: 3px; font-size: 11px; }
+.dw-add-interrupt { font-size: 12px; padding: 4px 8px; cursor: pointer; }
