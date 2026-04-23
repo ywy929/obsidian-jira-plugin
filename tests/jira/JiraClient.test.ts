@@ -128,10 +128,12 @@ describe('JiraClient.searchMyIssues', () => {
     const callArgs = mockedRequestUrl.mock.calls[0][0];
     expect(callArgs.method).toBe('GET');
     expect(callArgs.url).toContain('/rest/api/3/search?');
-    expect(callArgs.url).toContain('jql=');
-    expect(decodeURIComponent(callArgs.url)).toContain('project = PROD');
-    expect(decodeURIComponent(callArgs.url)).toContain('assignee = currentUser()');
-    expect(decodeURIComponent(callArgs.url)).toContain('sprint in openSprints()');
+    const qs = callArgs.url.split('?')[1];
+    const params = new URLSearchParams(qs);
+    const jqlParam = params.get('jql') ?? '';
+    expect(jqlParam).toContain('project = PROD');
+    expect(jqlParam).toContain('assignee = currentUser()');
+    expect(jqlParam).toContain('sprint in openSprints()');
   });
 });
 
