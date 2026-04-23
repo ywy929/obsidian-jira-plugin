@@ -279,6 +279,18 @@ export class JiraClient {
     };
   }
 
+  async addRemoteLink(key: string, url: string, title?: string): Promise<{ id: number }> {
+    const object: any = { url };
+    if (title && title.trim()) object.title = title.trim();
+    else object.title = url;
+    const raw = await this.request<any>({
+      method: 'POST',
+      path: `/rest/api/3/issue/${encodeURIComponent(key)}/remotelink`,
+      body: { object },
+    });
+    return { id: raw.id };
+  }
+
   async attachFile(key: string, filename: string, mimeType: string, fileBytes: ArrayBuffer): Promise<Attachment> {
     const boundary = '----ObsidianBoundary' + Date.now();
     const encoder = new TextEncoder();
