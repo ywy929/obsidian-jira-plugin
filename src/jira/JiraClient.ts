@@ -2,6 +2,7 @@ import { requestUrl, RequestUrlParam } from 'obsidian';
 import { PluginSettings } from '../settings/types';
 import { JiraError, User, Issue, Transition, Comment, Attachment, Worklog, CreateIssueInput, FieldPatch } from './types';
 import { parseAcceptanceCriteria } from './ac-parser';
+import { normalizeDescription } from './adf';
 
 type RequestOptions = {
   method?: 'GET' | 'POST' | 'PUT' | 'DELETE';
@@ -135,7 +136,7 @@ export class JiraClient {
 
   private mapIssue(raw: any): Issue {
     const fields = raw.fields ?? {};
-    const description = fields.description ?? undefined;
+    const description = normalizeDescription(fields.description);
 
     return {
       id: raw.id,

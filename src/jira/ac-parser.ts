@@ -3,6 +3,7 @@ const BULLET_REGEX = /^[\s]*[*-]\s+(.+?)\s*$/;
 
 export function parseAcceptanceCriteria(description: string | undefined): string[] {
   if (!description) return [];
+  if (typeof description !== 'string') return [];
 
   const lines = description.split(/\r?\n/);
   const headingIndex = lines.findIndex(line => HEADING_REGEX.test(line.trim()));
