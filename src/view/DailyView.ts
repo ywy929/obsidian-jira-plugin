@@ -5,7 +5,6 @@ import { renderIssueRow } from './IssueRow';
 import { showRowMenu } from './RowMenu';
 import { InterruptModal } from './InterruptModal';
 import { NewTaskModal } from './NewTaskModal';
-import { SeedModal } from './SeedModal';
 import { TextPromptModal } from './TextPromptModal';
 
 export const VIEW_TYPE_DAILY = 'daily-workflow-view';
@@ -36,11 +35,6 @@ export class DailyView extends ItemView {
 
     const body = root.createDiv({ cls: 'dw-body' });
     body.createEl('p', { text: 'Loading...', cls: 'dw-status' });
-
-    // ensure today's note exists + roll forward
-    const sync = this.plugin.getDailyNoteSync();
-    await sync.ensureTodayNote();
-    try { await sync.rollForwardFromYesterday(); } catch (_) { /* best effort */ }
 
     await this.render();
   }
@@ -100,13 +94,6 @@ export class DailyView extends ItemView {
       newTaskBtn.onclick = () => {
         new NewTaskModal(this.app, this.plugin, this.plugin.settings.projectKeys[0], () => this.render()).open();
       };
-
-      const seedSection = body.createDiv({ cls: 'dw-lane' });
-      seedSection.createEl('h4', { text: 'Seed today' });
-      const seedBtn = seedSection.createEl('button', { text: '+ Seed from tasks-on-hand', cls: 'dw-add-interrupt' });
-      seedBtn.onclick = () => {
-        new SeedModal(this.app, this.plugin, () => this.render()).open();
-      };
     } catch (e: any) {
       body.empty();
       body.createEl('p', { text: `Error: ${e.message ?? e.kind ?? 'unknown'}`, cls: 'dw-error' });
@@ -114,23 +101,6 @@ export class DailyView extends ItemView {
   }
 
   private async handleToggle(issue: Issue, checked: boolean) {
-    const sync = this.plugin.getDailyNoteSync();
-
-    // optimistic markdown write
-    try {
-      await sync.toggleCheckbox(issue.key, checked);
-    } catch (e: any) {
-      if (e.kind === 'conflict') {
-        new Notice('Daily note changed on disk — click refresh.');
-        await this.render();
-        return;
-      }
-      new Notice(`Write failed: ${e.message ?? 'unknown'}`);
-      await this.render();
-      return;
-    }
-
-    // resolve transition id
     try {
       const transitions = await this.plugin.jira.getTransitions(issue.key);
       const target = checked
@@ -141,16 +111,12 @@ export class DailyView extends ItemView {
 
       if (!target) {
         new Notice(`No suitable transition for ${issue.key}`);
+        await this.render();
         return;
       }
       await this.plugin.jira.transitionIssue(issue.key, target.id);
     } catch (e: any) {
-      try {
-        await sync.toggleCheckbox(issue.key, !checked);
-        new Notice(`Jira transition failed (${e.kind ?? 'error'}) — rolled back.`);
-      } catch {
-        new Notice(`Jira transition failed AND rollback failed — click Refresh to resync.`);
-      }
+      new Notice(`Jira transition failed: ${e.message ?? e.kind ?? 'unknown'}`);
       await this.render();
     }
   }
@@ -291,4 +257,3 @@ function formatBytes(bytes: number): string {
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
-

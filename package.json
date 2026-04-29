@@ -1,7 +1,7 @@
 {
   "name": "obsidian-daily-workflow",
-  "version": "0.1.0",
-  "description": "Personal daily note + Jira sync plugin.",
+  "version": "0.2.0",
+  "description": "Personal Jira sidebar plugin.",
   "main": "main.js",
   "scripts": {
     "dev": "node esbuild.config.mjs",

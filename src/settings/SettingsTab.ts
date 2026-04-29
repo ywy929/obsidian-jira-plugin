@@ -51,30 +51,6 @@ export class SettingsTab extends PluginSettingTab {
         }));
 
     new Setting(containerEl)
-      .setName('Daily folder path')
-      .setDesc('Vault-relative path where daily notes live (e.g. daily)')
-      .addText(t => t
-        .setPlaceholder('daily')
-        .setValue(this.plugin.settings.dailyFolderPath)
-        .onChange(async v => { this.plugin.settings.dailyFolderPath = v.trim() || 'daily'; await this.plugin.saveSettings(); }));
-
-    new Setting(containerEl)
-      .setName('Tasks-on-hand file path')
-      .setDesc('Vault-relative path to tasks-on-hand.md (used by "+ Seed from tasks-on-hand")')
-      .addText(t => t
-        .setPlaceholder('team/tasks-on-hand.md')
-        .setValue(this.plugin.settings.tasksOnHandPath)
-        .onChange(async v => { this.plugin.settings.tasksOnHandPath = v.trim() || 'team/tasks-on-hand.md'; await this.plugin.saveSettings(); }));
-
-    new Setting(containerEl)
-      .setName('Tasks-on-hand owner heading')
-      .setDesc('The "## <heading>" under which your rows live (e.g. "Yeow (Senior)")')
-      .addText(t => t
-        .setPlaceholder('Yeow (Senior)')
-        .setValue(this.plugin.settings.tasksOnHandOwnerHeading)
-        .onChange(async v => { this.plugin.settings.tasksOnHandOwnerHeading = v.trim() || 'Yeow (Senior)'; await this.plugin.saveSettings(); }));
-
-    new Setting(containerEl)
       .setName('Verify connection')
       .setDesc('Test the API token and cache your accountId')
       .addButton(btn => btn
